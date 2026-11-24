@@ -10,6 +10,9 @@ export default function Home() {
       <Link href="/grabar" className="record-link">
         {es.home.record}
       </Link>
+      <p>
+        <Link href="/panel">{es.panel.title}</Link>
+      </p>
       <HealthCheck />
     </main>
   );

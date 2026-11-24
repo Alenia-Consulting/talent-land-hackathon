@@ -42,7 +42,15 @@ export function buildForm(input: GuideInput): FormData {
   return form;
 }
 
-/** POST {apiUrl}/guia as multipart/form-data; XMLHttpRequest is used for upload progress. */
+/**
+ * POST {apiUrl}/guia as multipart/form-data; XMLHttpRequest is used for upload progress.
+ *
+ * NOT WIRED UP: the API has no /guia endpoint and does not accept files yet (it needs
+ * python-multipart). The recorder sends the marks with createGuide() in lib/guides.ts and keeps
+ * the video on the device through downloadGuide() below. This stays here for the PR that adds
+ * the upload; point it at the real endpoint then, and check the field names against
+ * contracts/openapi.json, because these are not the ones the API uses.
+ */
 export function uploadGuide(
   input: GuideInput,
   onProgress: (fraction: number) => void,
