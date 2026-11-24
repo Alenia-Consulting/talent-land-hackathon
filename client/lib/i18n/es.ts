@@ -255,6 +255,7 @@ export const es = {
   ajustes: {
     title: "Ponlo a tu gusto",
     lead: "Cámbialo cuando quieras. Se guarda solo en este móvil.",
+    preview: "Vista previa",
     textSize: "Tamaño del texto",
     textSizes: { s: "Texto pequeño", m: "Texto normal", l: "Texto grande" },
     dim: "Modo tenue",

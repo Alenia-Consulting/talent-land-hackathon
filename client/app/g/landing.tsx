@@ -6,12 +6,15 @@
 // The date of the last human review is here because freshness is the thing a person cannot
 // check for themselves, and a guide that is a year old describes a place that may be gone.
 
+import { useState } from "react";
+
 import type { Guide } from "../../lib/guides.ts";
 import { es } from "../../lib/i18n/es.ts";
 import { ThemeButton, Toggle } from "../controls.tsx";
 import { AntesalaMark, PlayIcon, WaveIcon } from "../icons.tsx";
 import { usePrefs } from "../prefs.tsx";
 import { Button, Card, Chip, Pill } from "../ui.tsx";
+import { SettingsSheet } from "./settings.tsx";
 
 const t = es.publica;
 
@@ -53,6 +56,7 @@ export function Landing({
   onSeeAll: () => void;
 }) {
   const { prefs, setPrefs } = usePrefs();
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const interests = availableInterests(guide);
 
   return (
@@ -64,7 +68,16 @@ export function Landing({
           </span>
           antesala
         </span>
-        <ThemeButton label={t.dimMode} />
+        <span className="flex items-center gap-2">
+          <ThemeButton label={t.dimMode} />
+          <button
+            type="button"
+            onClick={() => setSettingsOpen(true)}
+            className="inline-flex min-h-14 items-center rounded-[18px] bg-tarjeta px-5 text-base font-bold text-tinta"
+          >
+            {es.ajustes.open}
+          </button>
+        </span>
       </header>
 
       {guide.cover_photo_url && (
@@ -123,6 +136,8 @@ export function Landing({
           {t.seeAll}
         </Button>
       </div>
+
+      <SettingsSheet open={settingsOpen} onClose={() => setSettingsOpen(false)} />
     </>
   );
 }
