@@ -189,6 +189,8 @@ def upload_video(
         session.commit()
     except pipeline.ProcessingUnavailable as error:
         raise HTTPException(status_code=503, detail=str(error)) from error
+    except pipeline.ProcessingFailed as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
     except storage.StorageError as error:
         raise HTTPException(status_code=502, detail=str(error)) from error
     finally:
