@@ -24,8 +24,9 @@ router = APIRouter(tags=["guides"])
 # learns nothing about work in progress.
 NOT_FOUND = "guide not found"
 
-# Two minutes at 2.5 Mbps is roughly 37 MB; this leaves room without letting anyone fill the disk.
-MAX_VIDEO_BYTES = 100 * 1024 * 1024
+# Supabase Storage refuses files over 50 MB, and two minutes at 2.5 Mbps is roughly 37 MB. The
+# recorder checks the same limit (RECORDING.maxUploadBytes in client/lib/config.ts).
+MAX_VIDEO_BYTES = 50 * 1024 * 1024
 UPLOAD_DIR = pathlib.Path(tempfile.gettempdir()) / "antesala-uploads"
 CHUNK_BYTES = 1024 * 1024
 

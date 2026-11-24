@@ -30,6 +30,8 @@ export function apiUrl(): string {
 export const RECORDING = {
   maxDurationSec: 120,
   videoBitsPerSecond: 2_500_000,
+  /** Largest recording the API accepts: the Supabase Storage file limit. Keep in sync with api/routers/guides.py. */
+  maxUploadBytes: 50 * 1024 * 1024,
   /** getUserMedia video constraints (rear camera, 720p, 30 fps). */
   video: { width: 1280, height: 720, frameRate: 30 },
   /** Monitoring canvas: the current frame is drawn at this size every `sampleIntervalMs`. */

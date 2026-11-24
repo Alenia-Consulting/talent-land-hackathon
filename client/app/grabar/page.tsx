@@ -3,11 +3,12 @@
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { RECORDING } from "../../lib/config.ts";
 import { ApiError, createGuide, type Mark } from "../../lib/guides.ts";
 import { es } from "../../lib/i18n/es.ts";
 import type { AlertType } from "../../lib/pure/alerts.ts";
 import { markAt, whyNotSendable } from "../../lib/pure/marks.ts";
-import { downloadGuide, type GuideInput } from "../../lib/upload.ts";
+import { downloadGuide, type GuideInput, uploadVideo, VideoUploadError } from "../../lib/upload.ts";
 import { useAlertLog } from "../../lib/useAlertLog.ts";
 import { useCamera } from "../../lib/useCamera.ts";
 import { useFrameSampler } from "../../lib/useFrameSampler.ts";
@@ -21,9 +22,9 @@ import {
   DoneScreen,
   ErrorScreen,
   IntroScreen,
-  Message,
   PermissionScreen,
   ReviewScreen,
+  SendingScreen,
 } from "./screens.tsx";
 
 type Phase =
@@ -45,6 +46,8 @@ export default function GrabarPage() {
   const [plan, setPlan] = useState<Plan | null>(null);
   const [marks, setMarks] = useState<Mark[]>([]);
   const [guideId, setGuideId] = useState<string | null>(null);
+  const [videoSent, setVideoSent] = useState(false);
+  const [progress, setProgress] = useState(0);
   const [error, setError] = useState<{ source: ErrorSource; message: string } | null>(null);
   const t0 = useRef(0);
 
@@ -117,6 +120,7 @@ export default function GrabarPage() {
     alertLog.reset();
     setMarks([]);
     setGuideId(null);
+    setVideoSent(false);
     openCamera();
   };
 
@@ -144,28 +148,46 @@ export default function GrabarPage() {
 
   const send = async () => {
     // markProblem already keeps the button disabled; this is the guard, not the message.
-    if (!plan || !recorder.result || markProblem) return;
+    const input = guide();
+    if (!plan || !input || markProblem) return;
 
+    setProgress(0);
     setPhase("enviando");
     try {
-      const created = await createGuide({
-        title: plan.title,
-        venue_name: plan.venue,
-        video_duration_seconds: recorder.result.durationSec,
-        marks,
-      });
-      setGuideId(created.id);
+      // A retry after a failed upload reuses the guide: creating it again would leave a duplicate.
+      let id = guideId;
+      if (!id) {
+        const created = await createGuide({
+          title: plan.title,
+          venue_name: plan.venue,
+          video_duration_seconds: input.durationSec,
+          marks,
+        });
+        id = created.id;
+        setGuideId(id);
+      }
+      try {
+        await uploadVideo(id, input, setProgress);
+        setVideoSent(true);
+      } catch (cause) {
+        // 503: the API cannot process video yet. The guide is saved and the video stays on the device.
+        if (!(cause instanceof VideoUploadError && cause.status === 503)) throw cause;
+      }
       setPhase("hecho");
     } catch (cause) {
-      const message = cause instanceof ApiError ? cause.message : es.error.uploadFailed;
-      setError({ source: "upload", message });
+      const known = cause instanceof ApiError || (cause instanceof VideoUploadError && cause.status > 0);
+      setError({ source: "upload", message: known ? cause.message : es.error.uploadFailed });
       setPhase("error");
     }
   };
 
   // Known before sending, so it is shown on the review screen with "Enviar" disabled instead of
   // throwing the person onto a screen titled "Algo ha fallado" for something they can redo.
-  const markProblem = recorder.result ? whyNotSendable(marks, recorder.result.durationSec) : null;
+  const markProblem = recorder.result
+    ? recorder.result.blob.size > RECORDING.maxUploadBytes
+      ? es.revision.tooBig
+      : whyNotSendable(marks, recorder.result.durationSec)
+    : null;
 
   const reviewNotice =
     recorder.result?.stopReason === "background"
@@ -193,8 +215,8 @@ export default function GrabarPage() {
         problem={markProblem}
       />
     ),
-    enviando: <Message title={es.enviando.title} />,
-    hecho: <DoneScreen />,
+    enviando: <SendingScreen progress={progress} />,
+    hecho: <DoneScreen videoSent={videoSent} />,
     error: <ErrorScreen message={error?.message ?? es.error.camera.unknown} />,
   }[phase as Exclude<Phase, "listo" | "grabando">];
 
@@ -230,15 +252,17 @@ export default function GrabarPage() {
     enviando: null,
     hecho: (
       <>
-        <ActionButton
-          variant="secondary"
-          onClick={() => {
-            const input = guide();
-            if (input) downloadGuide(input);
-          }}
-        >
-          {es.error.download}
-        </ActionButton>
+        {!videoSent && (
+          <ActionButton
+            variant="secondary"
+            onClick={() => {
+              const input = guide();
+              if (input) downloadGuide(input);
+            }}
+          >
+            {es.error.download}
+          </ActionButton>
+        )}
         {guideId && <Link href={`/panel/guia?id=${guideId}`}>{es.hecho.review}</Link>}
         <ActionButton onClick={retry}>{es.hecho.again}</ActionButton>
       </>

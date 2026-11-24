@@ -35,41 +35,62 @@ export function videoFileName(mimeType: string): string {
   return `recorrido.${fileExtension(mimeType)}`;
 }
 
-export function buildForm(input: GuideInput): FormData {
+/** The API reads a single `video` field; everything else about the route travels in POST /guides. */
+export function buildVideoForm(input: GuideInput): FormData {
   const form = new FormData();
   form.append("video", new Blob([input.blob], { type: baseMimeType(input.mimeType) }), videoFileName(input.mimeType));
-  form.append("metadata", JSON.stringify(buildMetadata(input)));
   return form;
 }
 
+/** The API refused the recording. `status` is 0 when the request never arrived. */
+export class VideoUploadError extends Error {
+  // Declared, not a constructor parameter property: Node's type stripping rejects those.
+  readonly status: number;
+
+  constructor(status: number, message: string) {
+    super(message);
+    this.name = "VideoUploadError";
+    this.status = status;
+  }
+}
+
+/** FastAPI answers `{"detail": "..."}` for business rules; anything else falls back to the status. */
+function readDetail(status: number, responseText: string): string {
+  try {
+    const detail = (JSON.parse(responseText) as { detail?: unknown }).detail;
+    if (typeof detail === "string") return detail;
+  } catch {
+    // Not JSON (a proxy error page): use the status.
+  }
+  return `HTTP ${status}`;
+}
+
 /**
- * POST {apiUrl}/guia as multipart/form-data; XMLHttpRequest is used for upload progress.
+ * POST {apiUrl}/guides/{guideId}/video as multipart/form-data; XMLHttpRequest gives upload progress.
  *
- * NOT WIRED UP YET. The API does accept the recording now, at POST /guides/{guide_id}/video,
- * but it answers 503 until the face blurring in api/media/pipeline.py exists: a recording with
- * recognisable faces must never reach storage. Meanwhile the recorder sends the marks with
- * createGuide() in lib/guides.ts and keeps the video on the device through downloadGuide() below.
- * When the blurring lands, point this at `${apiUrl()}/guides/${guideId}/video` and send one
- * `video` field; those are the names in contracts/openapi.json, not the ones built above.
+ * The API answers 503 while the face blurring in api/media/pipeline.py does not exist: a recording
+ * with recognisable faces must never reach storage. The caller treats that as "guide saved, video
+ * still on the device", not as a failure.
  */
-export function uploadGuide(
+export function uploadVideo(
+  guideId: string,
   input: GuideInput,
   onProgress: (fraction: number) => void,
   createXhr: () => XMLHttpRequest = () => new XMLHttpRequest(),
 ): Promise<void> {
   return new Promise((resolve, reject) => {
     const xhr = createXhr();
-    xhr.open("POST", `${apiUrl()}/guia`);
+    xhr.open("POST", `${apiUrl()}/guides/${guideId}/video`);
     xhr.upload.onprogress = (event) => {
       if (event.lengthComputable) onProgress(event.loaded / event.total);
     };
     xhr.onload = () => {
       if (xhr.status >= 200 && xhr.status < 300) resolve();
-      else reject(new Error(`HTTP ${xhr.status}`));
+      else reject(new VideoUploadError(xhr.status, readDetail(xhr.status, xhr.responseText)));
     };
-    xhr.onerror = () => reject(new Error("network"));
-    xhr.ontimeout = () => reject(new Error("timeout"));
-    xhr.send(buildForm(input));
+    xhr.onerror = () => reject(new VideoUploadError(0, "network"));
+    xhr.ontimeout = () => reject(new VideoUploadError(0, "timeout"));
+    xhr.send(buildVideoForm(input));
   });
 }
 
@@ -82,7 +103,7 @@ function saveBlob(blob: Blob, fileName: string): void {
   setTimeout(() => URL.revokeObjectURL(url), 10_000);
 }
 
-/** Fallback when the upload fails: save the video and its metadata JSON on the device. */
+/** Fallback while the video cannot be sent: save it and its recording data on the device. */
 export function downloadGuide(input: GuideInput): void {
   saveBlob(input.blob, videoFileName(input.mimeType));
   const json = new Blob([JSON.stringify(buildMetadata(input), null, 2)], { type: "application/json" });
