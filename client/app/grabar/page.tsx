@@ -15,7 +15,14 @@ import { useFrameSampler } from "../../lib/useFrameSampler.ts";
 import { useLightMonitor } from "../../lib/useLightMonitor.ts";
 import { useMotionMonitor } from "../../lib/useMotionMonitor.ts";
 import { useRecorder } from "../../lib/useRecorder.ts";
-import { CameraPreview, DebugPanel, RecordingClock, WarningStack } from "./overlays.tsx";
+import {
+  CameraPreview,
+  CoachCard,
+  DebugPanel,
+  RecordingBar,
+  StepRail,
+  WarningStack,
+} from "./overlays.tsx";
 import { PartsScreen, type Plan } from "./parts.tsx";
 import {
   ActionButton,
@@ -55,7 +62,9 @@ export default function GrabarPage() {
   const recorder = useRecorder();
   const alertLog = useAlertLog();
 
-  const preview = (phase === "listo" || phase === "grabando") && camera.status === "ready";
+  // The only two dark screens of the recorder: the ones with the camera behind them.
+  const cameraPhase = phase === "listo" || phase === "grabando";
+  const preview = cameraPhase && camera.status === "ready";
   const sample = useFrameSampler(camera.videoRef, preview);
   const onAlert = useCallback(
     (tipo: AlertType) => (event: { type: "start" | "end"; at: number }) => {
@@ -228,13 +237,19 @@ export default function GrabarPage() {
         {es.permisos.action}
       </ActionButton>
     ),
-    listo: <ActionButton onClick={startRecording}>{es.listo.start}</ActionButton>,
+    listo: (
+      <ActionButton tone="dark" onClick={startRecording}>
+        {es.listo.start}
+      </ActionButton>
+    ),
     grabando: (
       <>
         {pending.length > 0 && (
-          <ActionButton onClick={markArrival}>{es.marcar.action(pending[0].title)}</ActionButton>
+          <ActionButton tone="dark" onClick={markArrival}>
+            {es.marcar.action(pending[0].title)}
+          </ActionButton>
         )}
-        <ActionButton variant="danger" onClick={() => recorder.stop("user")}>
+        <ActionButton tone="dark" variant="danger" onClick={() => recorder.stop("user")}>
           {es.grabando.stop}
         </ActionButton>
       </>
@@ -281,11 +296,17 @@ export default function GrabarPage() {
   }[phase];
 
   return (
-    <section className="fixed inset-0 flex flex-col bg-tinta text-niebla">
-      {phase === "listo" || phase === "grabando" ? (
+    <section
+      className={`fixed inset-0 flex flex-col ${
+        cameraPhase ? "bg-tinta text-niebla" : "bg-niebla text-tinta"
+      }`}
+    >
+      {cameraPhase ? (
         <div className="relative min-h-0 flex-1 overflow-hidden">
           <CameraPreview stream={camera.stream} videoRef={camera.videoRef} />
-          {phase === "grabando" && <RecordingClock remainingSec={recorder.remainingSec} />}
+          {phase === "grabando" && (
+            <RecordingBar remainingSec={recorder.remainingSec} maxSec={RECORDING.maxDurationSec} />
+          )}
           <WarningStack active={{ luz: light.active, movimiento: motion.active }} />
           {phase === "listo" && (
             <p className="absolute inset-x-4 bottom-4 rounded-2xl bg-tinta/80 px-4 py-3 text-center text-lg">
@@ -293,11 +314,10 @@ export default function GrabarPage() {
             </p>
           )}
           {phase === "grabando" && plan && (
-            <p className="absolute inset-x-4 bottom-4 rounded-2xl bg-tinta/80 px-4 py-3 text-center text-lg">
-              {pending.length === 0
-                ? es.marcar.done
-                : `${es.marcar.progress(marks.length, plan.parts.length)} · ${es.marcar.hint}`}
-            </p>
+            <>
+              <CoachCard nextPart={pending[0]?.title ?? null} />
+              <StepRail parts={plan.parts} done={marks.length} />
+            </>
           )}
           {debug && (
             <DebugPanel

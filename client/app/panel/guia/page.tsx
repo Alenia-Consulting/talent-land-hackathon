@@ -18,6 +18,8 @@ import {
   type StepPatch,
 } from "../../../lib/guides.ts";
 import { es } from "../../../lib/i18n/es.ts";
+import { countMissing } from "../../../lib/pure/review.ts";
+import { AlertIcon, CheckIcon } from "../../icons.tsx";
 import { Button, Card, StatusChip } from "../../ui.tsx";
 import { StepForm } from "./step-form.tsx";
 
@@ -61,13 +63,16 @@ function GuideDetail() {
   if (!id) return <p role="alert">{es.publica.missingSlug}</p>;
   if (error && !guide)
     return (
-      <p role="alert" className="rounded-2xl bg-coral/15 p-4 text-[#9c3a22]">
+      <p role="alert" className="rounded-2xl bg-coral/15 p-4 text-sobre-coral">
         {error}
       </p>
     );
   if (!guide) return <p className="text-tinta/70">{es.panel.loading}</p>;
 
   const pending = guide.pending;
+  // Counted here rather than taken from pending.missing_data, which counts STEPS that have
+  // something missing. The banner names fields, so it has to count fields.
+  const missingCount = countMissing(guide.steps);
   const ready = pending
     ? pending.missing_data === 0 && pending.steps_reviewed === pending.steps_total
     : false;
@@ -80,18 +85,73 @@ function GuideDetail() {
       </div>
       <p className="mt-1 text-tinta/70">{guide.venue_name}</p>
 
-      {pending && (
-        <p
-          className={`mt-4 rounded-2xl p-4 font-bold ${
-            ready ? "bg-salvia text-pino" : "bg-ambar/35 text-[#7a4b00]"
-          }`}
-        >
-          {ready ? t.ready : t.pending(pending)}
+      {/* Why the draft has holes, said before the person starts filling them in. */}
+      {missingCount > 0 && (
+        <p className="mt-4 flex items-start gap-3 rounded-2xl bg-ambar/35 p-4 text-sobre-ambar">
+          <AlertIcon size={26} />
+          <span>{t.blanks(missingCount)}</span>
         </p>
       )}
 
+      {pending && (
+        <Card className="mt-4">
+          <h2 className="text-2xl font-extrabold">{t.beforePublish}</h2>
+          <span
+            className="mt-3 block h-2 w-full overflow-hidden rounded-full bg-salvia"
+            role="progressbar"
+            aria-valuemin={0}
+            aria-valuemax={pending.steps_total}
+            aria-valuenow={pending.steps_reviewed}
+          >
+            <span
+              className="block h-full rounded-full bg-pino"
+              style={{
+                width: `${pending.steps_total > 0 ? (pending.steps_reviewed / pending.steps_total) * 100 : 0}%`,
+              }}
+            />
+          </span>
+          <p className="mt-2 text-tinta/70">
+            {ready ? t.ready : t.reviewedCount(pending.steps_reviewed, pending.steps_total)}
+          </p>
+
+          <ul className="mt-4 grid gap-2">
+            {/* Only claimed when there is media to have blurred. Saying "faces blurred" about a
+                guide with no clips would be the panel vouching for work nobody did. */}
+            {guide.steps.some((step) => step.clip_url) && (
+              <>
+                <li className="flex items-center gap-3 text-pino">
+                  <CheckIcon size={22} />
+                  <span className="text-tinta">{t.blurred}</span>
+                </li>
+                <li className="flex items-center gap-3 text-pino">
+                  <CheckIcon size={22} />
+                  <span className="text-tinta">{t.filtered}</span>
+                </li>
+              </>
+            )}
+            {missingCount > 0 && (
+              <li className="flex items-center gap-3 text-sobre-ambar">
+                <AlertIcon size={22} />
+                <span className="text-tinta">{t.toComplete(missingCount)}</span>
+              </li>
+            )}
+          </ul>
+
+          {guide.status !== "published" && (
+            <p className="mt-5">
+              <Button disabled={busy || !ready} onClick={publish}>
+                {busy ? t.publishing : t.publish}
+              </Button>
+            </p>
+          )}
+          <p className="mt-4 rounded-2xl bg-salvia p-4 text-base text-pino">
+            {t.nothingWithoutYou}
+          </p>
+        </Card>
+      )}
+
       {error && (
-        <p role="alert" className="mt-4 rounded-2xl bg-coral/15 p-4 text-[#9c3a22]">
+        <p role="alert" className="mt-4 rounded-2xl bg-coral/15 p-4 text-sobre-coral">
           {error}
         </p>
       )}
@@ -116,13 +176,6 @@ function GuideDetail() {
         ))}
       </ol>
 
-      {guide.status !== "published" && (
-        <p className="mt-6">
-          <Button disabled={busy || !ready} onClick={publish}>
-            {busy ? t.publishing : t.publish}
-          </Button>
-        </p>
-      )}
     </>
   );
 }

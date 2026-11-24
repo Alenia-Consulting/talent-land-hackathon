@@ -11,13 +11,30 @@ export const es = {
     recordLead: "2 minutos con el móvil. Te guiamos.",
   },
   intro: {
-    title: "Graba el recorrido",
-    lead: "Vas a grabar un vídeo corto (máximo 2 minutos) del camino que seguirá una persona: entrada, recepción, espera, consulta y salida.",
+    step: "Paso 1 de 3",
+    title: "Antes de grabar",
+    lead: "Grabarás el camino de alguien que viene por primera vez. Mientras grabas, te iremos guiando.",
     tips: [
-      "Camina despacio.",
-      "Enciende todas las luces.",
-      "Graba cuando haya poca gente.",
-      "Empieza en la puerta de entrada.",
+      {
+        icon: "luz",
+        title: "Luz normal, sin sol de frente",
+        body: "Enciende las luces de siempre. Si una ventana deslumbra, baja la persiana.",
+      },
+      {
+        icon: "gente",
+        title: "Con poca gente",
+        body: "Mejor a primera hora. Las caras y las voces se ocultan solas.",
+      },
+      {
+        icon: "andar",
+        title: "Camina despacio",
+        body: "Para 3 segundos en cada zona. Ahí sale la foto y se mide el sonido.",
+      },
+      {
+        icon: "cartel",
+        title: "Pon el cartel de aviso",
+        body: "Avisa de que estás grabando antes de empezar.",
+      },
     ],
     next: "Continuar",
   },
@@ -32,7 +49,29 @@ export const es = {
     hint: "Colócate en la puerta de entrada y pulsa «Empezar».",
     start: "Empezar",
   },
-  grabando: { stop: "Parar", remaining: "Tiempo restante" },
+  grabando: {
+    stop: "Parar",
+    remaining: "Tiempo restante",
+    max: "máx. 2:00",
+    nextPart: (parte: string) => `Siguiente parte: ${parte}`,
+    nextHint:
+      "Cuando llegues, pulsa «Llegué» y quédate quieto 3 segundos. Así sale una foto clara y se mide el sonido.",
+    allDone: "Ya marcaste todas las partes. Para cuando quieras.",
+  },
+  // While the guide is being put together. Each line is a real stage of the pipeline, so a
+  // person waiting knows what is happening to their recording and why it takes a minute.
+  proceso: {
+    step: "Paso 3 de 3",
+    title: "Estamos montando tu guía",
+    lead: "No cierres esta pantalla todavía.",
+    stages: [
+      "Las partes con tus nombres",
+      "Clips cortados y estabilizados",
+      "Difuminando las caras",
+      "Filtrando las voces",
+      "Midiendo el ruido de cada zona",
+    ],
+  },
   alerts: {
     luz: "Poca luz. Enciende las luces.",
     movimiento: "Más despacio",
@@ -107,10 +146,21 @@ export const es = {
     status: "Estado",
     open: "Abrir",
     record: "Grabar un recorrido",
+    newGuide: "Nueva guía",
+    search: "Buscar por guía o centro",
+    searchEmpty: "Ninguna guía coincide con lo que buscas.",
+    filters: { all: "Todas", published: "Publicadas", pending: "Pendientes" },
+    // The only count the panel shows, because it is the only one the API actually knows.
+    // Visits and "escucharon el sitio" are in the design as sample data; inventing them here
+    // would be the product telling the venue something nobody measured.
+    needsAttention: "Necesitan tu atención",
+    lastReview: "Última revisión",
+    never: "Sin revisar",
+    review: "Revisar",
+    edit: "Editar",
     statuses: { draft: "Borrador", needs_review: "Por revisar", published: "Publicada" },
     detail: {
       back: "Volver a las guías",
-      missing: "Falta por completar",
       reviewed: "Revisado",
       publish: "Aprobar y publicar",
       publishing: "Publicando…",
@@ -118,14 +168,30 @@ export const es = {
       pending: (p: { steps_reviewed: number; steps_total: number; missing_data: number }) =>
         `${p.steps_reviewed} de ${p.steps_total} pasos revisados · ${plural(p.missing_data, "dato por completar", "datos por completar")}`,
       ready: "Todo revisado. Ya se puede publicar.",
+      beforePublish: "Antes de publicar",
+      reviewedCount: (hechos: number, total: number) => `${hechos} de ${total} pasos revisados`,
+      blanks: (n: number) =>
+        `La IA ha dejado ${plural(n, "dato en blanco", "datos en blanco")} porque no salían en el vídeo. Complétalos antes de publicar.`,
+      // Said where the publish button is, because it is the promise the button keeps.
+      nothingWithoutYou: "Nada se publica sin tu aprobación. La IA hace el borrador; tú decides.",
+      blurred: "Caras difuminadas en todos los clips",
+      filtered: "Voces filtradas",
+      toComplete: (n: number) => plural(n, "dato por completar", "datos por completar"),
       fields: {
         easy_read_text: "Texto en lectura fácil",
         who_to_ask_for_help: "A quién pedir ayuda",
         duration_text: "Cuánto se tarda",
         noise_level: "Nivel de ruido",
       },
-      noise: { quiet: "Tranquilo", medium: "Normal", noisy: "Ruidoso", unset: "Sin medir" },
+      noise: { quiet: "Tranquilo", medium: "Medio", noisy: "Ruidoso", unset: "Sin medir" },
       noiseManual: "corregido a mano",
+      noiseMeasured: "medido",
+      // Shown under a field the AI left empty. It says why it is empty and whose job it is now,
+      // instead of looking like the model failed.
+      missingHint: "No se veía en el vídeo: complétalo tú.",
+      missing: (campo: string) => `Falta: ${campo}`,
+      // What easy read actually asks for, next to the box where it is written.
+      easyReadHints: ["Frases cortas", "Una idea por frase", "Segunda persona"],
       save: "Guardar",
       saveAndReview: "Guardar y revisar",
       saving: "Guardando…",
