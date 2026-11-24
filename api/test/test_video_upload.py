@@ -9,7 +9,7 @@ import pathlib
 import uuid
 
 from media import faces, pipeline, storage
-from test.media_fixtures import make_video
+from media_fixtures import make_video
 
 
 def upload(client, guide_id, *, content=b"fake video bytes", content_type="video/mp4"):

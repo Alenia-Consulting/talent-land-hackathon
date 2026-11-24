@@ -3,7 +3,7 @@
 import numpy as np
 
 from media import faces
-from test.media_fixtures import face_frame
+from media_fixtures import face_frame
 
 
 def test_a_real_face_is_found():

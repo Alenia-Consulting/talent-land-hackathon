@@ -6,7 +6,7 @@ import cv2
 import pytest
 
 from media import faces, pipeline, video_io
-from test.media_fixtures import make_video
+from media_fixtures import make_video
 
 STEPS = [
     pipeline.StepTiming(position=1, start_seconds=0.0, end_seconds=2.0, photo_second=1.0),
