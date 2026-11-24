@@ -56,6 +56,13 @@ def _with_pending(guide: Guide) -> GuideOut:
     return detail
 
 
+def _set_processing_status(session: Session, guide: Guide, status: str) -> None:
+    """Save where the recording is, dropping whatever half-done work is still pending."""
+    session.rollback()
+    guide.processing_status = status
+    session.commit()
+
+
 def _load(session: Session, guide_id: uuid.UUID) -> Guide:
     guide = guides.get(session, guide_id)
     if guide is None:
@@ -154,11 +161,14 @@ def upload_video(
 
     if not (video.content_type or "").startswith("video/"):
         raise HTTPException(status_code=415, detail="el fichero debe ser un vídeo")
+    if guide.processing_status == "processing":
+        raise HTTPException(status_code=409, detail="este vídeo ya se está procesando")
 
     UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
     target = UPLOAD_DIR / f"{guide_id}-{uuid.uuid4().hex}"
     try:
         _save_upload(video, target)
+        _set_processing_status(session, guide, "processing")
 
         timings = [
             pipeline.StepTiming(
@@ -177,21 +187,27 @@ def upload_video(
             step = by_position.get(item.position)
             if step is None:
                 continue
-            base = f"{guide.public_slug or guide.id}/paso-{item.position}"
-            step.clip_url = storage.upload(config, f"{base}.mp4", item.clip, "video/mp4")
-            step.photo_url = storage.upload(config, f"{base}.jpg", item.photo, "image/jpeg")
+            # Always the id: the slug only exists once published, and the path must not move then.
+            base = f"{guide.id}/paso-{item.position}"
+            step.clip_path = storage.upload(config, f"{base}.mp4", item.clip, "video/mp4")
+            step.photo_path = storage.upload(config, f"{base}.jpg", item.photo, "image/jpeg")
             if item.sound is not None:
                 storage.upload(config, f"{base}.mp3", item.sound, "audio/mpeg")
                 step.sound_available = True
             if item.noise_level is not None:
                 step.noise_level = item.noise_level
                 step.noise_level_source = "measured"
+        guide.processing_status = "done"
         session.commit()
     except pipeline.ProcessingUnavailable as error:
+        # Nothing was tried, so the guide goes back to waiting for a recording.
+        _set_processing_status(session, guide, "pending")
         raise HTTPException(status_code=503, detail=str(error)) from error
     except pipeline.ProcessingFailed as error:
+        _set_processing_status(session, guide, "failed")
         raise HTTPException(status_code=422, detail=str(error)) from error
     except storage.StorageError as error:
+        _set_processing_status(session, guide, "failed")
         raise HTTPException(status_code=502, detail=str(error)) from error
     finally:
         # The recording never stays on the server, whatever happened above.

@@ -40,10 +40,35 @@ def test_the_secret_key_authorises_the_upload(config):
     assert sent["headers"]["Authorization"] == "Bearer secret"
 
 
-def test_the_public_url_is_what_a_visitor_opens(config):
-    url = storage.upload(config, "guia/paso-1.jpg", b"x", "image/jpeg", send=lambda *_: 200)
+def test_upload_answers_the_path_and_replaces_an_earlier_try(config):
+    sent = {}
 
-    assert url == "https://project.supabase.co/storage/v1/object/public/guides/guia/paso-1.jpg"
+    def send(url, data, headers):
+        sent["headers"] = headers
+        return 200
+
+    path = storage.upload(config, "guia/paso-1.jpg", b"x", "image/jpeg", send=send)
+
+    assert path == "guia/paso-1.jpg"
+    assert sent["headers"]["x-upsert"] == "true"
+
+
+def test_the_public_url_is_what_a_visitor_opens(monkeypatch):
+    monkeypatch.setenv("SUPABASE_URL", "https://project.supabase.co/")
+    monkeypatch.delenv("SUPABASE_BUCKET", raising=False)
+
+    assert (
+        storage.public_url("guia/paso-1.jpg")
+        == "https://project.supabase.co/storage/v1/object/public/guides/guia/paso-1.jpg"
+    )
+
+
+def test_there_is_no_public_url_without_a_file_or_without_storage(monkeypatch):
+    monkeypatch.setenv("SUPABASE_URL", "https://project.supabase.co")
+    assert storage.public_url(None) is None
+
+    monkeypatch.delenv("SUPABASE_URL")
+    assert storage.public_url("guia/paso-1.jpg") is None
 
 
 def test_a_refused_upload_is_reported_not_swallowed(config):
