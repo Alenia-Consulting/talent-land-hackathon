@@ -1,0 +1,2 @@
+# Windows line endings (CRLF) break the container entrypoints.
+*.sh text eol=lf

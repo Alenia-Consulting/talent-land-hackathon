@@ -6,4 +6,14 @@ dependencies = [
     "fastapi==0.115.0",
     "uvicorn==0.32.0",
     "python-dotenv==1.0.1",
+    "sqlalchemy==2.0.58",
+    "alembic==1.19.2",
+    "psycopg[binary]==3.3.8",
 ]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["test"]
+
+[tool.coverage.run]
+omit = ["migrations/*", "test/*"]
