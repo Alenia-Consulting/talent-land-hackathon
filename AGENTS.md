@@ -16,8 +16,6 @@ will be introduced.
 - `.github/`: CI/CD pipelines and workflows
 - `kubernetes/`: infrastructure and deployment configs
 - `docker/`: infrastructure and deployment configs
-- Contact the technical team if some of those folders needs to modified, as sometimes the apps will
-    require updates on Containers / Kubernetes objects
 
 ## Working Guidelines
 
@@ -31,12 +29,9 @@ will be introduced.
 - Respect the CI steps, like linting, build and test if exist
 - The application is ready only to be on staging through the `development` branch
     - If you notice you application is not in staging, contact the technical team
-- Merge to `main` means that we are going to production, contact the technical team before as they
-    have to check if that step can be fulfilled
+- Merge to `main` means that we are going to production
 - To move to production the directory `kubernetes/overlays/production/` must exist and Kubernetes
-    objects from `kubernetes/overlays/staging/` must be inside. Contact the
-    [Alenia Technical team](#alenia-technical-team) to be aware of this action and support you if
-    you need it to
+    objects from `kubernetes/overlays/staging/` must be inside
 - If you face a challenge feel free to contact the [Alenia Technical team](#alenia-technical-team),
     share a screenshot or a definition of the problem you have
 - Use an environment variable file if need it to store sensitive information and insert that filename into the `.gitignore` to avoid tracking.
