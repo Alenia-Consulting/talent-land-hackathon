@@ -1,4 +1,7 @@
+# Environment files (secrets): only the templates are tracked
 .env
+.env.*
+!.env.example
 
 node_modules/
 dist/
@@ -9,3 +12,14 @@ __pycache__/
 *$py.class
 
 .pem
+
+# Python tooling
+.venv/
+.pytest_cache/
+.coverage
+
+# Next.js
+.next/
+out/
+next-env.d.ts
+*.tsbuildinfo

@@ -9,6 +9,19 @@ spec:
       app: talent-land-hackathon-api
   template:
     metadata:
+      annotations:
+        # Renders every key of the Vault secret (DATABASE_URL, ...) to /vault/secrets/.env,
+        # sourced by docker/backend/entrypoint.sh before migrations and uvicorn.
+        vault.hashicorp.com/agent-inject: "true"
+        vault.hashicorp.com/role: "talent-land-hackathon-staging"
+        vault.hashicorp.com/agent-inject-secret-.env: "secret/data/talent-land-hackathon/staging"
+        vault.hashicorp.com/agent-inject-template-.env: |
+          {{- with secret "secret/data/talent-land-hackathon/staging" -}}
+          {{- range $key, $value := .Data.data -}}
+          {{ $key }}="{{ $value }}"
+          {{ end -}}
+          {{- end -}}
+        vault.hashicorp.com/agent-pre-populate-only: "true"
       labels:
         app: talent-land-hackathon-api
     spec:

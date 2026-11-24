@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: talent-land-hackathon-api-config
+# Non-secret database settings, read by postgres/statefulset.yaml (POSTGRES_USER / POSTGRES_DB).
+# The password is PG_PASSWORD in Vault (secret/data/talent-land-hackathon/staging); the API's
+# DATABASE_URL in Vault must use this user, this database and the host
+# talent-land-hackathon-postgres.
+data:
+  PG_USER: "talent_land_hackathon"
+  PG_DATABASE: "talent_land_hackathon"
