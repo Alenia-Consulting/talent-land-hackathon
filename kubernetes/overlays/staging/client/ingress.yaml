@@ -1,0 +1,23 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: talent-land-hackathon
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - talent-land-hackathon.staging.alenia.io
+      secretName: talent-land-hackathon-tls
+  rules:
+    - host: talent-land-hackathon.staging.alenia.io
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: talent-land-hackathon
+                port:
+                  number: 80

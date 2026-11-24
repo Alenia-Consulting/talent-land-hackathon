@@ -1,0 +1,197 @@
+# Agent Rules
+
+- [Protected — Do Not Modify](#protected--do-not-modify)
+- [Working Guidelines](#working-guidelines)
+- [Database guidelines](#database-guidelines)
+- [VCS guidelines](#vcs-guidelines)
+- [Alenia Technical team](#alenia-technical-team)
+
+This file is initially created with the goal to align the Vibe Coding techniques across our
+repositories. The intention is to keep it un constants updates as rules and future conventions
+will be introduced.
+
+## Protected — Do Not Modify
+
+- `AGENTS.md`: Guidelines to develop software solutions inside Alenia Consulting organization
+- `.github/`: CI/CD pipelines and workflows
+- `kubernetes/`: infrastructure and deployment configs
+- `docker/`: infrastructure and deployment configs
+- Contact the technical team if some of those folders needs to modified, as sometimes the apps will
+    require updates on Containers / Kubernetes objects
+
+## Working Guidelines
+
+- Stay scoped to the task you are asked to do
+- Do not install new dependencies without developer confirmation
+    - Installing dependencies for testing and coverage is allowed
+- Do not refactor code outside the files relevant to the current task
+- Always prefer small, focused changes over large rewrites
+- Do not use latest versions, use `x.y.z` if possible and only if the package, dependency use that
+    semantic versioning
+- Respect the CI steps, like linting, build and test if exist
+- The application is ready only to be on staging through the `development` branch
+    - If you notice you application is not in staging, contact the technical team
+- Merge to `main` means that we are going to production, contact the technical team before as they
+    have to check if that step can be fulfilled
+- To move to production the directory `kubernetes/overlays/production/` must exist and Kubernetes
+    objects from `kubernetes/overlays/staging/` must be inside. Contact the
+    [Alenia Technical team](#alenia-technical-team) to be aware of this action and support you if
+    you need it to
+- If you face a challenge feel free to contact the [Alenia Technical team](#alenia-technical-team),
+    share a screenshot or a definition of the problem you have
+- Use an environment variable file if need it to store sensitive information and insert that filename into the `.gitignore` to avoid tracking.
+- Code in English
+- If you are introducing tests, coverage or unit test, keep the test inside the application and on
+    its specific folder, example:
+    - If the repository has `api/` and `client/` directories applications, inside each of them must
+    exist the tests, resulting in `api/test/` and `client/test/`, outside those directories the
+    tests are not considered
+    - Must match the application's programming language, for example if the `api/` is a backend
+    typed in Python we can use `pytest` not `jest` on the other hand, if the application is the
+    `client/` use a test framework for that language like `jest` not `pytest` or `go test`
+- The test coverage must be at least >= 85% of the entire application codebase
+- If you need someone to test your application (e.g. the UI or the API), ask for help on the
+    **Channel Alenia All** channel in Microsoft Teams. If you do not know where that channel is, ask
+    the [Alenia Technical team](#alenia-technical-team)
+- Pull Request must be at most ~400 modifications
+    - Split the PR in several others if you forecast plenty of changes
+- Files must be at max 500 lines
+- If you are using Python for a source code, observe the [PEP 20 - The Zen of Python](https://peps.python.org/pep-0020/)
+- If for some reason you need to interact with the CI
+    - We need one CI for `api/` application
+    - We need one CI for `client/` application
+    - It is not required to test a DB, a Queue, or anything external, no docker-in-docker is required
+    on the CI pipeline
+- Never commit tokens or secrets; if one is pushed, rotate it immediately
+
+## Database guidelines
+
+This section applies only if the application uses a SQL database. Our reference database is
+PostgreSQL.
+
+### ORM and migrations
+
+- The backend (`api/`) must access the database through an ORM that has migrations:
+    - Python: SQLAlchemy 2.x + Alembic, with the `psycopg[binary]` driver (installs on Windows
+    without a C compiler)
+    - Node / TypeScript: Prisma (`prisma migrate`)
+    - Do not use a different ORM without talking to the
+    [Alenia Technical team](#alenia-technical-team)
+- The schema is changed **only** by migrations. Never call `Base.metadata.create_all()`,
+    `prisma db push`, `synchronize: true` or run manual `ALTER TABLE` statements against a shared
+    database
+- Migrations live inside the backend and are committed with the code that needs them:
+    - Python: `api/migrations/` (Alembic `script_location`)
+    - Node: `api/prisma/schema.prisma` and `api/prisma/migrations/`
+- Never edit or delete a migration that was already merged to `development`. Create a new one
+- Review autogenerated migrations before committing them; ORMs get renames, defaults and enum
+    changes wrong
+- One migration per logical change, with a descriptive name (`add_invoice_due_date`, not
+    `update`)
+- Migrations must be backward compatible with the previous release, because old and new Pods run
+    at the same time during a rollout. Use expand → migrate data → contract across separate
+    releases (e.g. add the new column, deploy, backfill, then drop the old column in a later PR)
+- Seed / demo data is not a migration. Keep it in a separate script (e.g. `api/scripts/seed.py`
+    or `prisma/seed.ts`) that never runs on staging or production automatically
+- The connection string comes from a single environment variable, `DATABASE_URL`. Never hardcode
+    it and never commit it
+    - Python: `postgresql+psycopg://USER:PASSWORD@HOST:5432/DBNAME`
+    - Node: `postgresql://USER:PASSWORD@HOST:5432/DBNAME`
+    - Commit a `api/.env.example` with placeholder values; the real `.env` stays ignored by git
+
+### Data layer good practices
+
+- Keep the database code in its own layer (e.g. `api/db/` or `api/repositories/`). Routes and
+    business logic call that layer, never the ORM session or raw SQL directly. This also lets the
+    tests mock the database (the CI does not run a database)
+- Never build SQL by concatenating strings; use the ORM or bound parameters
+- Naming: `snake_case` for tables and columns, every table has a primary key, foreign keys have an
+    index
+- Store dates as `timestamptz` in UTC; add `created_at` / `updated_at` to business tables
+- Add `NOT NULL`, `UNIQUE` and foreign key constraints in the schema, not only in the code
+- Paginate list endpoints; never return a whole table
+- The application connects with its own database user, never with the `postgres` superuser
+
+### Local setup without Docker (Windows)
+
+For developers who run `npm` / `python` directly on their machine.
+
+- Install PostgreSQL with the official installer: <https://www.postgresql.org/download/windows/>.
+    Use the same major version as the one in `docker-compose.yaml` / Kubernetes
+    - Add `C:\Program Files\PostgreSQL\<version>\bin` to the `PATH` and check `psql --version`
+- Create the application user and database once:
+
+    ```powershell
+    psql -U postgres -c "CREATE ROLE app WITH LOGIN PASSWORD 'app';"
+    psql -U postgres -c "CREATE DATABASE myapp OWNER app;"
+    ```
+
+- Copy `api/.env.example` to `api/.env` and set `DATABASE_URL` with `localhost` as host
+- Apply the migrations, then start the backend:
+
+    ```powershell
+    # Python (from api/)
+    py -m venv .venv
+    .venv\Scripts\Activate.ps1
+    pip install -r requirements.txt
+    alembic upgrade head                                   # apply migrations
+    alembic revision --autogenerate -m "add_invoice_due_date"  # create a new one
+
+    # Node (from api/)
+    npm install
+    npx prisma migrate dev                                  # apply + create in development
+    npx prisma migrate dev --name add_invoice_due_date
+    ```
+
+- Every database command must work from PowerShell. Expose them as `npm` scripts or Python
+    commands, not as `.sh` scripts
+- Add a `.gitattributes` with `*.sh text eol=lf`; Windows line endings (CRLF) break the
+    container entrypoints
+
+## VCS guidelines
+
+- VSC: Version Control System (e. g., `git`, `mercurial`, etc., in Alenia we use `git`)
+- Code using a feature or ticket branches
+- Stable branches. Branch whose code is kept in a known-good deployable state at all times:
+    - `main`
+    - `development`
+    - Tags
+- If you are working on a new feature or fixing a bug inside an stable branch, make a branch from
+    `development`, example:
+
+    ```bash
+    git checkout -b branch-name origin/development
+    ```
+- Open a PR from your branch to `development` branch once the job is done
+    - First Pull Request (PR)?, contact the [Alenia Technical team](#alenia-technical-team) to
+    guide you
+- Do not track sensitive files, tokens or secrets
+- Use this syntax:
+    - `(TYPE) [TICKET:] IMPERATIVE-AND-SHORT-MESSAGE`
+    - `(PoC) Introduce CLI flags on aiops-redpanda`
+    - `(chore) OP-353: Introduce notification via email when service is down at Engie script`
+    - `(fix) Fix env. var. location for backend project`
+- Once the branch is merge and the feature or fix is validated please delete the branch
+- As this project is constantly maintained by Alenia Technical team several parts of it
+    will be modified without notification. That's why we ask you to update your branches and stay
+    update with `development` branch at least or the parent branch you are using. Example:
+
+    ```bash
+    # Fetch new changes.
+    git fetch origin
+
+    # Considering your parent branch is `development`.
+    # If you are already on your branch this next `git checkout` is optional.
+    git checkout my-branch
+
+    git pull --rebase origin development
+
+    # If you fave a conflict, solve it accepting the new changes from the parent branch.
+
+    # Continue working on your branch.
+    ```
+
+## Alenia Technical team
+
+- pierre.bourdois@alenia.io
+- franco.gil@alenia.io

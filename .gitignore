@@ -1,0 +1,11 @@
+.env
+
+node_modules/
+dist/
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+.pem

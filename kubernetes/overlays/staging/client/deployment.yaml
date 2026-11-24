@@ -1,0 +1,37 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: talent-land-hackathon-staging
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: talent-land-hackathon
+  template:
+    metadata:
+      labels:
+        app: talent-land-hackathon
+    spec:
+      containers:
+        - name: talent-land-hackathon
+          image: ghcr.io/alenia-consulting/talent-land-hackathon-frontend:0.0.1
+          ports:
+            - containerPort: 80
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          envFrom:
+            - configMapRef:
+                name: talent-land-hackathon-config
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "64Mi"
+            limits:
+              cpu: "100m"
+              memory: "128Mi"
+      imagePullSecrets:
+        - name: github-registry-alenia-secret

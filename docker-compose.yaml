@@ -1,0 +1,19 @@
+services:
+  talent-land-hackathon-frontend:
+    build:
+      context: .
+      dockerfile: docker/frontend/Dockerfile
+    ports:
+      - "${APP_PORT:-80}:80"
+    environment:
+      - API_UPSTREAM=talent-land-hackathon-api:8000
+    depends_on:
+      - talent-land-hackathon-api
+
+  talent-land-hackathon-api:
+    build:
+      context: .
+      dockerfile: docker/backend/Dockerfile
+    ports:
+      - "${API_PORT:-8000}:8000"
+
