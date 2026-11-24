@@ -27,7 +27,7 @@ spec:
     spec:
       containers:
         - name: talent-land-hackathon-api
-          image: ghcr.io/alenia-consulting/talent-land-hackathon-api:0.0.3
+          image: ghcr.io/alenia-consulting/talent-land-hackathon-api:0.0.4
           ports:
             - containerPort: 8000
           readinessProbe:
