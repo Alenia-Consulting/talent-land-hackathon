@@ -2,9 +2,9 @@
 
 // The review panel: every guide the venue has, drafts included.
 //
-// The design shows four figures across the top — visits, how many listened to the place, and so
-// on. Only one of them is a number this product actually measures, so only that one is here.
-// The others are sample data in the mock, and a panel that invents its own statistics is the
+// The design shows four figures across the top. Two of them this product counts; visits and how
+// many listened to the place are sample data in the mock and nothing measures them yet. They
+// keep their cards and show no number, because a panel that invents its own statistics is the
 // same lie as an AI that invents what a room looks like.
 
 import Link from "next/link";
@@ -38,6 +38,33 @@ function Thumbnail({ guide }: { guide: GuideSummary }) {
     return <img src={url} alt="" className="h-14 w-14 shrink-0 rounded-2xl object-cover" />;
   }
   return <span aria-hidden="true" className="h-14 w-14 shrink-0 rounded-2xl bg-salvia" />;
+}
+
+/**
+ * One figure of the row across the top. Without a value it says so rather than showing a zero:
+ * nothing measured and nothing happening look the same in a number and are not the same thing.
+ */
+function Stat({
+  label,
+  value,
+  attention,
+}: {
+  label: string;
+  value?: string;
+  attention?: boolean;
+}) {
+  return (
+    <div
+      className={`rounded-3xl p-5 ${attention ? "bg-ambar/35 text-sobre-ambar" : "bg-tarjeta"}`}
+    >
+      <p className={`text-base ${attention ? "" : "text-tinta/70"}`}>{label}</p>
+      {value ? (
+        <p className="mt-1 text-4xl font-extrabold">{value}</p>
+      ) : (
+        <p className="mt-1 text-xl text-tinta/40">{t.stats.notMeasured}</p>
+      )}
+    </div>
+  );
 }
 
 function Toolbar({
@@ -143,10 +170,17 @@ export default function PanelPage() {
         </Link>
       </div>
 
-      {counts.pending > 0 && (
-        <p className="mt-6 inline-block rounded-3xl bg-ambar/35 px-5 py-4 text-lg font-bold text-sobre-ambar">
-          {t.needsAttention}: {counts.pending}
-        </p>
+      {guides && (
+        <div className="mt-6 grid grid-cols-2 gap-3 md:grid-cols-4">
+          <Stat label={t.stats.published} value={String(counts.published)} />
+          <Stat label={t.stats.visits} />
+          <Stat label={t.stats.listened} />
+          <Stat
+            label={t.needsAttention}
+            value={String(counts.pending)}
+            attention={counts.pending > 0}
+          />
+        </div>
       )}
 
       {error && (

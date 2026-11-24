@@ -150,10 +150,17 @@ export const es = {
     search: "Buscar por guía o centro",
     searchEmpty: "Ninguna guía coincide con lo que buscas.",
     filters: { all: "Todas", published: "Publicadas", pending: "Pendientes" },
-    // The only count the panel shows, because it is the only one the API actually knows.
-    // Visits and "escucharon el sitio" are in the design as sample data; inventing them here
-    // would be the product telling the venue something nobody measured.
     needsAttention: "Necesitan tu atención",
+    // Two of the four figures the design shows are real. Visits and "escucharon el sitio" are
+    // sample data in the mock and nothing in this product measures them yet, so the cards are
+    // here with the layout the design asks for and an empty figure. Filling them in would be
+    // the panel telling the venue something nobody counted.
+    stats: {
+      published: "Guías publicadas",
+      visits: "Visitas en 30 días",
+      listened: "Escucharon el sitio",
+      notMeasured: "aún no se mide",
+    },
     lastReview: "Última revisión",
     never: "Sin revisar",
     review: "Revisar",
