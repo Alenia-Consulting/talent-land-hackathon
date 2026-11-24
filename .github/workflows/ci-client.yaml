@@ -1,0 +1,55 @@
+name: Node CI client
+
+on:
+  pull_request:
+    branches: [development]
+    paths:
+      - 'client/**'
+
+env:
+  NEXT_TELEMETRY_DISABLED: 1
+
+jobs:
+  build:
+    name: Build & Test
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: client
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Check Next.js Project Exists
+        run: |
+          if [ ! -f package.json ]; then
+            echo "::error::client/package.json not found, scaffold the Next.js app in client/ first"
+            exit 1
+          fi
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: "24.19.0"
+
+      - name: Install Dependencies
+        run: |
+          if [ -f package-lock.json ]; then npm ci; else npm install; fi
+
+      - name: Run Typecheck
+        run: npm run typecheck --if-present
+
+      - name: Lint Check
+        run: npm run lint --if-present
+
+      - name: Format Check
+        run: npm run format --if-present
+
+      - name: Run Build
+        run: npm run build
+
+      - name: Run Unit Tests
+        run: npm run test --if-present
+
+      - name: Run End to End Tests
+        run: npm run e2e --if-present

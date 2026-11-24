@@ -1,0 +1,4 @@
+# Test tooling, installed by the CI on top of requirements.txt. Not shipped in the container image.
+pytest==9.1.1
+pytest-cov==7.0.0
+httpx==0.28.1

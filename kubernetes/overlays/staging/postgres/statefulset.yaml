@@ -1,0 +1,93 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: talent-land-hackathon-postgres
+spec:
+  serviceName: talent-land-hackathon-postgres
+  replicas: 1
+  selector:
+    matchLabels:
+      app: talent-land-hackathon-postgres
+  template:
+    metadata:
+      annotations:
+        vault.hashicorp.com/agent-inject: "true"
+        vault.hashicorp.com/role: "talent-land-hackathon-staging"
+        # Renders just the raw password (no key= wrapping, no trailing newline) to a dedicated
+        # file: POSTGRES_PASSWORD_FILE below points the official postgres entrypoint at it.
+        vault.hashicorp.com/agent-inject-secret-postgres-password: "secret/data/talent-land-hackathon/staging"
+        vault.hashicorp.com/agent-inject-template-postgres-password: |
+          {{- with secret "secret/data/talent-land-hackathon/staging" -}}
+          {{- .Data.data.PG_PASSWORD -}}
+          {{- end -}}
+        # pre-populate ensures the secret file exists before the container starts
+        vault.hashicorp.com/agent-pre-populate-only: "true"
+      labels:
+        app: talent-land-hackathon-postgres
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:15.18-alpine3.24
+          ports:
+            - name: postgres
+              containerPort: 5432
+          # The image initializes its role/database from POSTGRES_USER / POSTGRES_DB, mapped
+          # explicitly from the API config so credentials stay in one place. The password comes
+          # from Vault through the image's native *_FILE support.
+          env:
+            - name: POSTGRES_USER
+              valueFrom:
+                configMapKeyRef:
+                  name: talent-land-hackathon-api-config
+                  key: PG_USER
+            - name: POSTGRES_DB
+              valueFrom:
+                configMapKeyRef:
+                  name: talent-land-hackathon-api-config
+                  key: PG_DATABASE
+            - name: POSTGRES_PASSWORD_FILE
+              value: /vault/secrets/postgres-password
+            # Data lives in a subdirectory so the PVC's lost+found does not collide with
+            # initdb's empty-directory check.
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+          readinessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - exec pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB" -h 127.0.0.1
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 5
+          livenessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - exec pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB" -h 127.0.0.1
+            initialDelaySeconds: 20
+            periodSeconds: 20
+            timeoutSeconds: 5
+          resources:
+            requests:
+              cpu: "20m"
+              memory: "128Mi"
+            limits:
+              cpu: "40m"
+              memory: "256Mi"
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        # Omitted so the cluster's default StorageClass provisions the volume. To pin a specific
+        # class, uncomment and set the name below.
+        # storageClassName: <default>
+        resources:
+          requests:
+            storage: 5Gi

@@ -2,4 +2,8 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: talent-land-hackathon-config
-data: {}
+# Browser runtime configuration: NEXT_PUBLIC_* keys are written to /env.js at container start
+# (docker/frontend/entrypoint.sh). Public values only, never secrets.
+data:
+  # Same origin: the frontend's nginx proxies /api to the talent-land-hackathon-api Service.
+  NEXT_PUBLIC_API_URL: "/api"

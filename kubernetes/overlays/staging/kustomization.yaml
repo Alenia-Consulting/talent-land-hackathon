@@ -4,8 +4,11 @@ kind: Component
 resources:
   - client/deployment.yaml
   - client/ingress.yaml
+  - api/configmap.yaml
   - api/deployment.yaml
   - api/service.yaml
+  - postgres/statefulset.yaml
+  - postgres/service.yaml
 
 components:
   - ../../base
