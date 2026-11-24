@@ -491,6 +491,11 @@
             "type": "string",
             "title": "Language"
           },
+          "processing_status": {
+            "type": "string",
+            "title": "Processing Status",
+            "description": "pending | processing | done | failed: where the recording is. A failed one can be sent again."
+          },
           "public_slug": {
             "anyOf": [
               {
@@ -598,6 +603,7 @@
           "venue_name",
           "status",
           "language",
+          "processing_status",
           "public_slug",
           "qr_url",
           "reviewed_at",
@@ -633,6 +639,11 @@
           "language": {
             "type": "string",
             "title": "Language"
+          },
+          "processing_status": {
+            "type": "string",
+            "title": "Processing Status",
+            "description": "pending | processing | done | failed: where the recording is. A failed one can be sent again."
           },
           "public_slug": {
             "anyOf": [
@@ -723,6 +734,7 @@
           "venue_name",
           "status",
           "language",
+          "processing_status",
           "public_slug",
           "qr_url",
           "reviewed_at",
@@ -922,7 +934,7 @@
               }
             ],
             "title": "Clip Url",
-            "description": "Trimmed, stabilised, face-blurred clip. No audio track."
+            "description": "Trimmed, face-blurred clip. No audio track."
           },
           "photo_url": {
             "anyOf": [

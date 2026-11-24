@@ -229,6 +229,11 @@ export interface components {
             /** Language */
             language: string;
             /**
+             * Processing Status
+             * @description pending | processing | done | failed: where the recording is. A failed one can be sent again.
+             */
+            processing_status: string;
+            /**
              * Public Slug
              * @description Segment of the public URL. Null until the guide is published.
              */
@@ -288,6 +293,11 @@ export interface components {
             status: string;
             /** Language */
             language: string;
+            /**
+             * Processing Status
+             * @description pending | processing | done | failed: where the recording is. A failed one can be sent again.
+             */
+            processing_status: string;
             /**
              * Public Slug
              * @description Segment of the public URL. Null until the guide is published.
@@ -430,7 +440,7 @@ export interface components {
             reviewed: boolean;
             /**
              * Clip Url
-             * @description Trimmed, stabilised, face-blurred clip. No audio track.
+             * @description Trimmed, face-blurred clip. No audio track.
              */
             clip_url: string | null;
             /**

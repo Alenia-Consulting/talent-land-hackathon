@@ -110,15 +110,15 @@ def test_a_real_recording_is_blurred_before_anything_reaches_storage(
     stored = {}
     monkeypatch.setattr(
         "media.storage.upload",
-        lambda config, path, data, content_type, **kwargs: stored.__setitem__(path, data) or f"https://x/{path}",
+        lambda config, path, data, content_type, **kwargs: stored.__setitem__(path, data) or path,
     )
     recording = make_video(tmp_path / "recording.mp4", seconds=2).read_bytes()
 
     response = upload(client, guide.id, content=recording)
 
     assert response.status_code == 200, response.text
-    assert set(stored) == {"centro-oeste/paso-1.mp4", "centro-oeste/paso-1.jpg"}
-    photo = cv2.imdecode(np.frombuffer(stored["centro-oeste/paso-1.jpg"], np.uint8), cv2.IMREAD_COLOR)
+    assert set(stored) == {f"{guide.id}/paso-1.mp4", f"{guide.id}/paso-1.jpg"}
+    photo = cv2.imdecode(np.frombuffer(stored[f"{guide.id}/paso-1.jpg"], np.uint8), cv2.IMREAD_COLOR)
     assert faces.find_faces(photo) == []
     assert list((tmp_path / "uploads").iterdir()) == []
 
@@ -138,6 +138,7 @@ def test_the_processed_media_reaches_storage_and_the_steps(
     db_session.commit()
 
     monkeypatch.setattr("routers.guides.UPLOAD_DIR", tmp_path)
+    monkeypatch.setenv("SUPABASE_URL", "https://p.supabase.co")
     monkeypatch.setattr(
         "media.pipeline.process",
         lambda video, steps: [
@@ -153,24 +154,125 @@ def test_the_processed_media_reaches_storage_and_the_steps(
     uploaded = []
     monkeypatch.setattr(
         "media.storage.upload",
-        lambda config, path, data, content_type, **kwargs: uploaded.append(path)
-        or f"https://p.supabase.co/storage/v1/object/public/guides/{path}",
+        lambda config, path, data, content_type, **kwargs: uploaded.append(path) or path,
     )
 
     response = upload(client, guide.id)
 
     assert response.status_code == 200, response.text
-    assert uploaded == [
-        "centro-oeste/paso-1.mp4",
-        "centro-oeste/paso-1.jpg",
-        "centro-oeste/paso-1.mp3",
-    ]
+    # The id, not the slug: the slug only exists once published and the path must not move then.
+    assert uploaded == [f"{guide.id}/paso-1.mp4", f"{guide.id}/paso-1.jpg", f"{guide.id}/paso-1.mp3"]
 
     step = response.json()["steps"][0]
-    assert step["clip_url"].endswith("centro-oeste/paso-1.mp4")
-    assert step["photo_url"].endswith("centro-oeste/paso-1.jpg")
+    base = "https://p.supabase.co/storage/v1/object/public/guides"
+    assert step["clip_url"] == f"{base}/{guide.id}/paso-1.mp4"
+    assert step["photo_url"] == f"{base}/{guide.id}/paso-1.jpg"
+    # The database keeps the path, not the URL.
+    db_session.refresh(guide)
+    assert guide.steps[0].clip_path == f"{guide.id}/paso-1.mp4"
     assert step["sound_available"] is True
     assert step["noise_level"] == "noisy"
     # Measured by the pipeline, not corrected by a person: the panel shows the difference.
     assert step["noise_level_source"] == "measured"
     assert list(tmp_path.iterdir()) == []
+
+
+def status_after(client, db_session, guide, **kwargs):
+    response = upload(client, guide.id, **kwargs)
+    db_session.refresh(guide)
+    return response, guide.processing_status
+
+
+def test_a_new_guide_waits_for_its_recording(client, db_session, make_guide):
+    guide = make_guide()
+    db_session.add(guide)
+    db_session.commit()
+
+    assert client.get(f"/guides/{guide.id}").json()["processing_status"] == "pending"
+
+
+def test_a_processed_recording_marks_the_guide_done(
+    client, db_session, make_guide, make_step, monkeypatch, tmp_path
+):
+    guide = make_guide()
+    guide.steps = [make_step(position=1)]
+    db_session.add(guide)
+    db_session.commit()
+    monkeypatch.setattr("routers.guides.UPLOAD_DIR", tmp_path)
+    monkeypatch.setattr("media.pipeline.process", lambda video, steps: [
+        pipeline.ProcessedStep(position=1, clip=b"c", photo=b"p", sound=None, noise_level=None)])
+    monkeypatch.setattr("media.storage.config_from_env",
+                        lambda: storage.StorageConfig(url="https://p.supabase.co", key="k"))
+    monkeypatch.setattr("media.storage.upload", lambda config, path, *a, **kw: path)
+
+    response, status = status_after(client, db_session, guide)
+
+    assert response.status_code == 200
+    assert status == "done"
+    assert response.json()["processing_status"] == "done"
+
+
+def test_a_recording_that_cannot_be_read_marks_the_guide_failed(client, db_session, make_guide):
+    guide = make_guide()
+    db_session.add(guide)
+    db_session.commit()
+
+    response, status = status_after(client, db_session, guide, content=b"not really a video" * 50)
+
+    assert response.status_code == 422
+    assert status == "failed"
+
+
+def test_a_storage_failure_marks_the_guide_failed_and_keeps_no_paths(
+    client, db_session, make_guide, make_step, monkeypatch, tmp_path
+):
+    guide = make_guide()
+    guide.steps = [make_step(position=1)]
+    db_session.add(guide)
+    db_session.commit()
+    monkeypatch.setattr("routers.guides.UPLOAD_DIR", tmp_path)
+    monkeypatch.setattr("media.pipeline.process", lambda video, steps: [
+        pipeline.ProcessedStep(position=1, clip=b"c", photo=b"p", sound=None, noise_level=None)])
+    monkeypatch.setattr("media.storage.config_from_env",
+                        lambda: storage.StorageConfig(url="https://p.supabase.co", key="k"))
+    calls = []
+
+    def flaky(config, path, *args, **kwargs):
+        calls.append(path)
+        if len(calls) == 2:
+            raise storage.StorageError("storage refused the upload: HTTP 500")
+        return path
+
+    monkeypatch.setattr("media.storage.upload", flaky)
+
+    response, status = status_after(client, db_session, guide)
+
+    assert response.status_code == 502
+    assert status == "failed"
+    assert guide.steps[0].clip_path is None
+
+
+def test_an_unavailable_pipeline_leaves_the_guide_waiting(client, db_session, make_guide, monkeypatch):
+    guide = make_guide()
+    db_session.add(guide)
+    db_session.commit()
+
+    def unavailable(video, steps):
+        raise pipeline.ProcessingUnavailable("ffmpeg no está disponible")
+
+    monkeypatch.setattr("media.pipeline.process", unavailable)
+
+    response, status = status_after(client, db_session, guide)
+
+    assert response.status_code == 503
+    assert status == "pending"
+
+
+def test_a_recording_already_being_processed_is_refused(client, db_session, make_guide):
+    guide = make_guide(processing_status="processing")
+    db_session.add(guide)
+    db_session.commit()
+
+    response = upload(client, guide.id)
+
+    assert response.status_code == 409

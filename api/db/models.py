@@ -53,6 +53,9 @@ class TimestampMixin:
 
 
 GUIDE_STATUSES = ("draft", "needs_review", "published")
+# Where the uploaded recording is: waiting for it, being blurred and cut, done, or failed (the
+# person can send it again).
+PROCESSING_STATUSES = ("pending", "processing", "done", "failed")
 
 
 class Guide(TimestampMixin, Base):
@@ -66,6 +69,10 @@ class Guide(TimestampMixin, Base):
         CheckConstraint(
             "status IN ('draft', 'needs_review', 'published')", name="status_is_known"
         ),
+        CheckConstraint(
+            "processing_status IN ('pending', 'processing', 'done', 'failed')",
+            name="processing_status_is_known",
+        ),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
@@ -74,6 +81,9 @@ class Guide(TimestampMixin, Base):
     venue_name: Mapped[str] = mapped_column(String(200), nullable=False)
     status: Mapped[str] = mapped_column(String(16), nullable=False, server_default="draft")
     language: Mapped[str] = mapped_column(String(10), nullable=False, server_default="es")
+    processing_status: Mapped[str] = mapped_column(
+        String(12), nullable=False, server_default="pending"
+    )
     # Null while the guide is a draft: it only gets a public URL once published.
     public_slug: Mapped[str | None] = mapped_column(String(100), unique=True)
     qr_url: Mapped[str | None] = mapped_column(Text)
@@ -164,8 +174,10 @@ class Step(TimestampMixin, Base):
     reviewed: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=false())
 
     # Added by the media pipeline.
-    clip_url: Mapped[str | None] = mapped_column(Text)
-    photo_url: Mapped[str | None] = mapped_column(Text)
+    # Paths inside the storage bucket, not URLs: the contract's `clip_url` and `photo_url` are built
+    # from them, so a new storage domain or a private bucket does not mean rewriting rows.
+    clip_path: Mapped[str | None] = mapped_column(Text)
+    photo_path: Mapped[str | None] = mapped_column(Text)
     sound_available: Mapped[bool] = mapped_column(
         Boolean, nullable=False, server_default=false()
     )

@@ -61,14 +61,26 @@ def upload(
     *,
     send: Callable[[str, bytes, dict[str, str]], int] = _send,
 ) -> str:
-    """Store one file and answer the URL a visitor opens."""
+    """Store one file and answer its path in the bucket.
+
+    Upserts, so sending a recording again after a failure replaces the files of the first try.
+    """
     base = config.url.rstrip("/")
     status = send(
         f"{base}/storage/v1/object/{config.bucket}/{path}",
         data,
-        {"Authorization": f"Bearer {config.key}", "Content-Type": content_type},
+        {"Authorization": f"Bearer {config.key}", "Content-Type": content_type, "x-upsert": "true"},
     )
     if status >= 400:
         raise StorageError(f"storage refused the upload: HTTP {status}")
 
-    return f"{base}/storage/v1/object/public/{config.bucket}/{path}"
+    return path
+
+
+def public_url(path: str | None) -> str | None:
+    """The URL a visitor opens for a stored path, or None when there is no file (or no storage)."""
+    url = os.environ.get("SUPABASE_URL", "")
+    if not path or not url:
+        return None
+    bucket = os.environ.get("SUPABASE_BUCKET", DEFAULT_BUCKET)
+    return f"{url.rstrip('/')}/storage/v1/object/public/{bucket}/{path}"

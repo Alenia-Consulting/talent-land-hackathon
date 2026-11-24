@@ -10,9 +10,10 @@ import uuid
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from db.models import NOISE_LEVELS, STEP_CATEGORIES, STEP_INTERESTS
+from media import storage
 
 Category = Literal[STEP_CATEGORIES]
 NoiseLevel = Literal[NOISE_LEVELS]
@@ -89,8 +90,12 @@ class StepOut(BaseModel):
                     "step has one.",
     )
     reviewed: bool = Field(description="Whether a person already checked this step.")
-    clip_url: str | None = Field(description="Trimmed, stabilised, face-blurred clip. No audio track.")
-    photo_url: str | None = Field(description="Face-blurred still frame of this part.")
+    clip_url: str | None = Field(
+        validation_alias="clip_path",
+        description="Trimmed, face-blurred clip. No audio track.")
+    photo_url: str | None = Field(
+        validation_alias="photo_path",
+        description="Face-blurred still frame of this part.")
     sound_available: bool = Field(
         description="Whether the low-pass filtered ambience exists. It never plays on its own.")
     noise_level: str | None = Field(
@@ -100,6 +105,12 @@ class StepOut(BaseModel):
     noise_level_source: str | None = Field(
         description="'measured' by the pipeline, or 'manual' when the venue corrected it.")
     pictogram_url: str | None = Field(description="ARASAAC pictogram (CC BY-NC-SA).")
+
+
+    @field_validator("clip_url", "photo_url", mode="after")
+    @classmethod
+    def _as_public_url(cls, path: str | None) -> str | None:
+        return storage.public_url(path)
 
 
 class Pending(BaseModel):
@@ -121,6 +132,9 @@ class GuideSummary(BaseModel):
     status: str = Field(
         description="draft | needs_review | published. Only a human moves it to published.")
     language: str
+    processing_status: str = Field(
+        description="pending | processing | done | failed: where the recording is. A failed one "
+                    "can be sent again.")
     public_slug: str | None = Field(
         description="Segment of the public URL. Null until the guide is published.")
     qr_url: str | None
