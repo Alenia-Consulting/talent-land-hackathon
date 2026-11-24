@@ -1,10 +1,13 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { ApiError, createGuide, type Mark } from "../../lib/guides.ts";
 import { es } from "../../lib/i18n/es.ts";
 import type { AlertType } from "../../lib/pure/alerts.ts";
-import { downloadGuide, type GuideInput, uploadGuide } from "../../lib/upload.ts";
+import { markAt, whyNotSendable } from "../../lib/pure/marks.ts";
+import { downloadGuide, type GuideInput } from "../../lib/upload.ts";
 import { useAlertLog } from "../../lib/useAlertLog.ts";
 import { useCamera } from "../../lib/useCamera.ts";
 import { useFrameSampler } from "../../lib/useFrameSampler.ts";
@@ -12,24 +15,36 @@ import { useLightMonitor } from "../../lib/useLightMonitor.ts";
 import { useMotionMonitor } from "../../lib/useMotionMonitor.ts";
 import { useRecorder } from "../../lib/useRecorder.ts";
 import { CameraPreview, DebugPanel, RecordingClock, WarningStack } from "./overlays.tsx";
+import { PartsScreen, type Plan } from "./parts.tsx";
 import {
   ActionButton,
   DoneScreen,
   ErrorScreen,
   IntroScreen,
+  Message,
   PermissionScreen,
   ReviewScreen,
-  SendingScreen,
 } from "./screens.tsx";
 
-type Phase = "intro" | "permisos" | "listo" | "grabando" | "revision" | "enviando" | "hecho" | "error";
+type Phase =
+  | "intro"
+  | "partes"
+  | "permisos"
+  | "listo"
+  | "grabando"
+  | "revision"
+  | "enviando"
+  | "hecho"
+  | "error";
 type ErrorSource = "camera" | "upload";
 
 export default function GrabarPage() {
   const [phase, setPhase] = useState<Phase>("intro");
   const [debug, setDebug] = useState(false);
   const [resumed, setResumed] = useState(false);
-  const [progress, setProgress] = useState(0);
+  const [plan, setPlan] = useState<Plan | null>(null);
+  const [marks, setMarks] = useState<Mark[]>([]);
+  const [guideId, setGuideId] = useState<string | null>(null);
   const [error, setError] = useState<{ source: ErrorSource; message: string } | null>(null);
   const t0 = useRef(0);
 
@@ -100,7 +115,19 @@ export default function GrabarPage() {
   const retry = () => {
     recorder.reset();
     alertLog.reset();
+    setMarks([]);
+    setGuideId(null);
     openCamera();
+  };
+
+  const pending = plan ? plan.parts.slice(marks.length) : [];
+
+  /** "Llegué a: X" — the second of the recording where this part begins. */
+  const markArrival = () => {
+    const part = pending[0];
+    if (!part) return;
+    setMarks([...marks, markAt(part, performance.now() - t0.current)]);
+    navigator.vibrate?.(60);
   };
 
   const guide = (): GuideInput | null => {
@@ -116,18 +143,29 @@ export default function GrabarPage() {
   };
 
   const send = async () => {
-    const input = guide();
-    if (!input) return;
-    setProgress(0);
+    // markProblem already keeps the button disabled; this is the guard, not the message.
+    if (!plan || !recorder.result || markProblem) return;
+
     setPhase("enviando");
     try {
-      await uploadGuide(input, setProgress);
+      const created = await createGuide({
+        title: plan.title,
+        venue_name: plan.venue,
+        video_duration_seconds: recorder.result.durationSec,
+        marks,
+      });
+      setGuideId(created.id);
       setPhase("hecho");
-    } catch {
-      setError({ source: "upload", message: es.error.uploadFailed });
+    } catch (cause) {
+      const message = cause instanceof ApiError ? cause.message : es.error.uploadFailed;
+      setError({ source: "upload", message });
       setPhase("error");
     }
   };
+
+  // Known before sending, so it is shown on the review screen with "Enviar" disabled instead of
+  // throwing the person onto a screen titled "Algo ha fallado" for something they can redo.
+  const markProblem = recorder.result ? whyNotSendable(marks, recorder.result.durationSec) : null;
 
   const reviewNotice =
     recorder.result?.stopReason === "background"
@@ -138,17 +176,31 @@ export default function GrabarPage() {
 
   const body = {
     intro: <IntroScreen />,
+    partes: (
+      <PartsScreen
+        onReady={(chosen) => {
+          setPlan(chosen);
+          setPhase("permisos");
+        }}
+      />
+    ),
     permisos: <PermissionScreen starting={camera.status === "starting"} resumed={resumed} />,
     revision: recorder.result && (
-      <ReviewScreen url={recorder.result.url} alerts={alertLog.alerts} notice={reviewNotice} />
+      <ReviewScreen
+        url={recorder.result.url}
+        alerts={alertLog.alerts}
+        notice={reviewNotice}
+        problem={markProblem}
+      />
     ),
-    enviando: <SendingScreen progress={progress} />,
+    enviando: <Message title={es.enviando.title} />,
     hecho: <DoneScreen />,
     error: <ErrorScreen message={error?.message ?? es.error.camera.unknown} />,
   }[phase as Exclude<Phase, "listo" | "grabando">];
 
   const actions = {
-    intro: <ActionButton onClick={() => setPhase("permisos")}>{es.intro.next}</ActionButton>,
+    intro: <ActionButton onClick={() => setPhase("partes")}>{es.intro.next}</ActionButton>,
+    partes: null,
     permisos: (
       <ActionButton onClick={openCamera} disabled={camera.status === "starting"}>
         {es.permisos.action}
@@ -156,20 +208,41 @@ export default function GrabarPage() {
     ),
     listo: <ActionButton onClick={startRecording}>{es.listo.start}</ActionButton>,
     grabando: (
-      <ActionButton variant="danger" onClick={() => recorder.stop("user")}>
-        {es.grabando.stop}
-      </ActionButton>
+      <>
+        {pending.length > 0 && (
+          <ActionButton onClick={markArrival}>{es.marcar.action(pending[0].title)}</ActionButton>
+        )}
+        <ActionButton variant="danger" onClick={() => recorder.stop("user")}>
+          {es.grabando.stop}
+        </ActionButton>
+      </>
     ),
     revision: (
       <>
         <ActionButton variant="secondary" onClick={retry}>
           {es.revision.retry}
         </ActionButton>
-        <ActionButton onClick={send}>{es.revision.send}</ActionButton>
+        <ActionButton onClick={send} disabled={markProblem !== null}>
+          {es.revision.send}
+        </ActionButton>
       </>
     ),
     enviando: null,
-    hecho: <ActionButton onClick={retry}>{es.hecho.again}</ActionButton>,
+    hecho: (
+      <>
+        <ActionButton
+          variant="secondary"
+          onClick={() => {
+            const input = guide();
+            if (input) downloadGuide(input);
+          }}
+        >
+          {es.error.download}
+        </ActionButton>
+        {guideId && <Link href={`/panel/guia?id=${guideId}`}>{es.hecho.review}</Link>}
+        <ActionButton onClick={retry}>{es.hecho.again}</ActionButton>
+      </>
+    ),
     error:
       error?.source === "upload" ? (
         <>
@@ -184,15 +257,22 @@ export default function GrabarPage() {
   }[phase];
 
   return (
-    <section className="fixed inset-0 flex flex-col bg-black text-white">
+    <section className="fixed inset-0 flex flex-col bg-tinta text-niebla">
       {phase === "listo" || phase === "grabando" ? (
         <div className="relative min-h-0 flex-1 overflow-hidden">
           <CameraPreview stream={camera.stream} videoRef={camera.videoRef} />
           {phase === "grabando" && <RecordingClock remainingSec={recorder.remainingSec} />}
           <WarningStack active={{ luz: light.active, movimiento: motion.active }} />
           {phase === "listo" && (
-            <p className="absolute inset-x-4 bottom-4 rounded-xl bg-black/60 px-4 py-3 text-center text-lg">
+            <p className="absolute inset-x-4 bottom-4 rounded-2xl bg-tinta/80 px-4 py-3 text-center text-lg">
               {es.listo.hint}
+            </p>
+          )}
+          {phase === "grabando" && plan && (
+            <p className="absolute inset-x-4 bottom-4 rounded-2xl bg-tinta/80 px-4 py-3 text-center text-lg">
+              {pending.length === 0
+                ? es.marcar.done
+                : `${es.marcar.progress(marks.length, plan.parts.length)} · ${es.marcar.hint}`}
             </p>
           )}
           {debug && (

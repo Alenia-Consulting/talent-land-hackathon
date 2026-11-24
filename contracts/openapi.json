@@ -309,6 +309,60 @@
         }
       }
     },
+    "/guides/{guide_id}/video": {
+      "post": {
+        "tags": [
+          "guides"
+        ],
+        "summary": "Upload Video",
+        "description": "Receive the recording, blur the faces and store only the processed media.\n\nThe original never reaches storage and is deleted from this server either way: it shows the\nfaces of patients and staff who did not agree to be filmed. Answers 503 while the blurring is\nnot implemented, rather than storing a recording nobody has cleaned.",
+        "operationId": "upload_video_guides__guide_id__video_post",
+        "parameters": [
+          {
+            "name": "guide_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Guide Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_upload_video_guides__guide_id__video_post"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GuideOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/health": {
       "get": {
         "tags": [
@@ -352,6 +406,21 @@
   },
   "components": {
     "schemas": {
+      "Body_upload_video_guides__guide_id__video_post": {
+        "properties": {
+          "video": {
+            "type": "string",
+            "format": "binary",
+            "title": "Video",
+            "description": "The recording, as taken by the phone."
+          }
+        },
+        "type": "object",
+        "required": [
+          "video"
+        ],
+        "title": "Body_upload_video_guides__guide_id__video_post"
+      },
       "GuideCreate": {
         "properties": {
           "title": {

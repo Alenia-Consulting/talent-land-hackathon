@@ -5,7 +5,11 @@ import type { CameraErrorKind } from "../pure/cameraError.ts";
 const plural = (n: number, one: string, many: string): string => `${n} ${n === 1 ? one : many}`;
 
 export const es = {
-  home: { record: "Grabar un recorrido" },
+  home: {
+    record: "Grabar un recorrido",
+    tagline: "Que ninguna visita sea la primera.",
+    recordLead: "2 minutos con el móvil. Te guiamos.",
+  },
   intro: {
     title: "Graba el recorrido",
     lead: "Vas a grabar un vídeo corto (máximo 2 minutos) del camino que seguirá una persona: entrada, recepción, espera, consulta y salida.",
@@ -35,6 +39,7 @@ export const es = {
   },
   revision: {
     title: "Revisa el vídeo",
+    cannotSend: "Todavía no se puede enviar",
     retry: "Repetir",
     send: "Enviar",
     noAlerts: "Sin avisos de calidad.",
@@ -45,7 +50,14 @@ export const es = {
     fastSegments: (n: number) => plural(n, "tramo rápido", "tramos rápidos"),
   },
   enviando: { title: "Enviando el vídeo…", keepOpen: "No cierres esta pantalla." },
-  hecho: { title: "¡Listo!", lead: "El vídeo se envió correctamente.", again: "Grabar otro" },
+  hecho: {
+    title: "¡Listo!",
+    // The video is not uploaded yet: saying it was sent would be a lie, and the person would lose
+    // the only copy. Offer the download instead until the API accepts files.
+    lead: "Se guardó el recorrido con sus partes. El vídeo todavía no se envía: descárgalo para no perderlo.",
+    review: "Revisar la guía",
+    again: "Grabar otro",
+  },
   error: {
     title: "Algo ha fallado",
     retryCamera: "Reintentar",
@@ -63,4 +75,71 @@ export const es = {
     } satisfies Record<CameraErrorKind, string>,
   },
   debug: { title: "Depuración" },
+  partes: {
+    title: "¿Qué partes vas a grabar?",
+    lead: "Elige las partes por las que vas a pasar, en orden. Durante la grabación pulsarás «Llegué a» cuando llegues a cada una.",
+    guideTitle: "Nombre del recorrido",
+    guideTitlePlaceholder: "Recorrido principal",
+    venue: "Nombre del centro",
+    venuePlaceholder: "Centro de Salud Oeste",
+    chosen: "Partes elegidas",
+    empty: "Todavía no has elegido ninguna parte.",
+    remove: "Quitar",
+    add: "Añadir",
+    next: "Continuar",
+    needTwo: "Elige al menos dos partes.",
+    needVenue: "Escribe el nombre del centro.",
+  },
+  marcar: {
+    action: (parte: string) => `Llegué a: ${parte}`,
+    done: "Todas las partes marcadas",
+    progress: (hechas: number, total: number) => `${hechas} de ${total} partes marcadas`,
+    hint: "Quédate quieto 3 segundos al llegar.",
+  },
+  panel: {
+    title: "Tus guías",
+    lead: "Todas las guías de tus centros. Revisa las que avisan de cambios.",
+    empty: "Todavía no hay ninguna guía. Graba un recorrido para empezar.",
+    loading: "Cargando…",
+    venue: "Centro",
+    status: "Estado",
+    open: "Abrir",
+    record: "Grabar un recorrido",
+    statuses: { draft: "Borrador", needs_review: "Por revisar", published: "Publicada" },
+    detail: {
+      back: "Volver a las guías",
+      missing: "Falta por completar",
+      reviewed: "Revisado",
+      publish: "Aprobar y publicar",
+      publishing: "Publicando…",
+      published: "Publicada. Este es el enlace para la visita:",
+      pending: (p: { steps_reviewed: number; steps_total: number; missing_data: number }) =>
+        `${p.steps_reviewed} de ${p.steps_total} pasos revisados · ${plural(p.missing_data, "dato por completar", "datos por completar")}`,
+      ready: "Todo revisado. Ya se puede publicar.",
+      fields: {
+        easy_read_text: "Texto en lectura fácil",
+        who_to_ask_for_help: "A quién pedir ayuda",
+        duration_text: "Cuánto se tarda",
+        noise_level: "Nivel de ruido",
+      },
+      noise: { quiet: "Tranquilo", medium: "Normal", noisy: "Ruidoso", unset: "Sin medir" },
+      noiseManual: "corregido a mano",
+      save: "Guardar",
+      saveAndReview: "Guardar y revisar",
+      saving: "Guardando…",
+      seconds: (from: number, to: number) => `Del segundo ${from} al ${to}`,
+    },
+  },
+  publica: {
+    loading: "Cargando la guía…",
+    notFound: "No encontramos esta guía. Puede que el enlace sea incorrecto.",
+    reviewedAt: (fecha: string) => `Revisado por el centro el ${fecha}`,
+    steps: "El recorrido, paso a paso",
+    whatToExpect: "Qué vas a encontrar",
+    whoToAsk: "Si necesitas ayuda",
+    duration: "Cuánto se tarda",
+    noise: { quiet: "Sitio tranquilo", medium: "Ruido normal", noisy: "Sitio ruidoso" },
+    noMedia: "Todavía no hay vídeo ni foto de esta parte.",
+    missingSlug: "Falta el enlace de la guía.",
+  },
 } as const;

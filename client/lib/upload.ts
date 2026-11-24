@@ -42,7 +42,16 @@ export function buildForm(input: GuideInput): FormData {
   return form;
 }
 
-/** POST {apiUrl}/guia as multipart/form-data; XMLHttpRequest is used for upload progress. */
+/**
+ * POST {apiUrl}/guia as multipart/form-data; XMLHttpRequest is used for upload progress.
+ *
+ * NOT WIRED UP YET. The API does accept the recording now, at POST /guides/{guide_id}/video,
+ * but it answers 503 until the face blurring in api/media/pipeline.py exists: a recording with
+ * recognisable faces must never reach storage. Meanwhile the recorder sends the marks with
+ * createGuide() in lib/guides.ts and keeps the video on the device through downloadGuide() below.
+ * When the blurring lands, point this at `${apiUrl()}/guides/${guideId}/video` and send one
+ * `video` field; those are the names in contracts/openapi.json, not the ones built above.
+ */
 export function uploadGuide(
   input: GuideInput,
   onProgress: (fraction: number) => void,

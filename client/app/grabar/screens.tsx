@@ -16,16 +16,16 @@ export function ActionButton({
   disabled?: boolean;
 }) {
   const colors = {
-    primary: "bg-white text-black",
-    secondary: "bg-white/15 text-white",
-    danger: "bg-red-600 text-white",
+    primary: "bg-niebla text-tinta",
+    secondary: "bg-white/15 text-niebla",
+    danger: "bg-coral text-white",
   }[variant];
   return (
     <button
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className={`min-h-14 flex-1 rounded-2xl px-6 text-lg font-semibold disabled:opacity-50 ${colors}`}
+      className={`min-h-14 flex-1 rounded-[18px] px-6 text-lg font-bold disabled:opacity-45 ${colors}`}
     >
       {children}
     </button>
@@ -44,10 +44,10 @@ export function Message({ title, children }: { title: string; children?: ReactNo
 export function IntroScreen() {
   return (
     <Message title={es.intro.title}>
-      <p className="text-lg text-white/80">{es.intro.lead}</p>
+      <p className="text-lg text-niebla/80">{es.intro.lead}</p>
       <ul className="flex flex-col gap-3 text-lg">
         {es.intro.tips.map((tip) => (
-          <li key={tip} className="rounded-xl bg-white/10 px-4 py-3">
+          <li key={tip} className="rounded-2xl bg-niebla/10 px-4 py-3">
             {tip}
           </li>
         ))}
@@ -59,8 +59,8 @@ export function IntroScreen() {
 export function PermissionScreen({ starting, resumed }: { starting: boolean; resumed: boolean }) {
   return (
     <Message title={es.permisos.title}>
-      <p className="text-lg text-white/80">{starting ? es.permisos.starting : es.permisos.lead}</p>
-      {resumed && <p className="text-base text-amber-300">{es.permisos.resumed}</p>}
+      <p className="text-lg text-niebla/80">{starting ? es.permisos.starting : es.permisos.lead}</p>
+      {resumed && <p className="text-base text-ambar">{es.permisos.resumed}</p>}
     </Message>
   );
 }
@@ -78,18 +78,32 @@ export function ReviewScreen({
   url,
   alerts,
   notice,
+  problem,
 }: {
   url: string;
   alerts: RecordingAlert[];
   notice: string | null;
+  /** Why this recording cannot be sent, shown here instead of on an error screen. */
+  problem: string | null;
 }) {
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-4">
       <h1 className="text-2xl font-bold">{es.revision.title}</h1>
-      <video src={url} className="max-h-[55vh] w-full rounded-xl bg-black object-contain" controls playsInline />
-      {notice && <p className="rounded-xl bg-amber-500/20 px-4 py-3 text-base text-amber-200">{notice}</p>}
-      <p className="text-base text-white/80">
-        <span className="font-semibold">{es.revision.alertsTitle}: </span>
+      <video
+        src={url}
+        className="max-h-[55vh] w-full rounded-2xl bg-tinta object-contain"
+        controls
+        playsInline
+      />
+      {problem && (
+        <div className="rounded-2xl bg-ambar/25 px-4 py-3" role="alert">
+          <p className="text-lg font-bold text-ambar">{es.revision.cannotSend}</p>
+          <p className="mt-1 text-base text-niebla/90">{problem}</p>
+        </div>
+      )}
+      {notice && <p className="rounded-2xl bg-ambar/20 px-4 py-3 text-base text-ambar">{notice}</p>}
+      <p className="text-base text-niebla/80">
+        <span className="font-bold">{es.revision.alertsTitle}: </span>
         {alertSummary(alerts)}
       </p>
     </div>
@@ -110,7 +124,7 @@ export function SendingScreen({ progress }: { progress: number }) {
         <div className="h-full bg-white transition-[width] duration-300" style={{ width: `${percent}%` }} />
       </div>
       <p className="text-lg tabular-nums">{percent}%</p>
-      <p className="text-base text-white/70">{es.enviando.keepOpen}</p>
+      <p className="text-base text-niebla/70">{es.enviando.keepOpen}</p>
     </Message>
   );
 }
@@ -118,7 +132,7 @@ export function SendingScreen({ progress }: { progress: number }) {
 export function DoneScreen() {
   return (
     <Message title={es.hecho.title}>
-      <p className="text-lg text-white/80">{es.hecho.lead}</p>
+      <p className="text-lg text-niebla/80">{es.hecho.lead}</p>
     </Message>
   );
 }
@@ -126,7 +140,7 @@ export function DoneScreen() {
 export function ErrorScreen({ message }: { message: string }) {
   return (
     <Message title={es.error.title}>
-      <p className="text-lg text-white/80" role="alert">
+      <p className="text-lg text-niebla/80" role="alert">
         {message}
       </p>
     </Message>

@@ -39,7 +39,7 @@ export function WarningStack({ active }: { active: Record<AlertType, boolean> })
       {(["luz", "movimiento"] as const).map((type) => (
         <p
           key={type}
-          className={`rounded-full bg-amber-500/90 px-4 py-2 text-base font-medium text-black transition-opacity duration-500 ${
+          className={`rounded-full bg-ambar px-4 py-2 text-base font-bold text-tinta transition-opacity duration-500 ${
             active[type] ? "opacity-100" : "opacity-0"
           }`}
           aria-hidden={!active[type]}
@@ -57,7 +57,7 @@ export function RecordingClock({ remainingSec }: { remainingSec: number }) {
       className="absolute inset-x-0 top-0 flex items-center justify-center gap-2 bg-gradient-to-b from-black/60 to-transparent px-4 pb-6 pt-[max(0.75rem,env(safe-area-inset-top))]"
       aria-label={es.grabando.remaining}
     >
-      <span className="size-3 rounded-full bg-red-500" aria-hidden />
+      <span className="size-3 rounded-full bg-coral" aria-hidden />
       <span className="text-2xl font-semibold tabular-nums">{formatClock(remainingSec)}</span>
     </div>
   );
@@ -77,7 +77,7 @@ const fixed = (value: number | null) => (value === null ? "–" : value.toFixed(
 
 export function DebugPanel({ values }: { values: DebugValues }) {
   return (
-    <dl className="pointer-events-none absolute bottom-2 left-2 rounded bg-black/70 p-2 font-mono text-xs leading-5">
+    <dl className="pointer-events-none absolute bottom-2 left-2 rounded bg-tinta/80 p-2 font-mono text-xs leading-5">
       <dt className="sr-only">{es.debug.title}</dt>
       <dd>luz: {fixed(values.luminance)}</dd>
       <dd>giro: {fixed(values.gyroDps)} °/s</dd>
