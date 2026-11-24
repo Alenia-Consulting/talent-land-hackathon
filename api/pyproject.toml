@@ -9,6 +9,7 @@ dependencies = [
     "sqlalchemy==2.0.58",
     "alembic==1.19.2",
     "psycopg[binary]==3.3.8",
+    "python-multipart==0.0.20",
 ]
 
 [tool.pytest.ini_options]
