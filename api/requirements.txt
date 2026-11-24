@@ -6,3 +6,10 @@ python-dotenv==1.0.1
 sqlalchemy==2.0.58
 alembic==1.19.2
 psycopg[binary]==3.3.8
+# Face blurring (media/faces.py, media/video_io.py). `deface` brings the CenterFace model and needs
+# opencv-python, not the headless build, because it declares that name. imageio-ffmpeg ships the
+# ffmpeg binary, so the image needs no system ffmpeg.
+deface==1.5.0
+opencv-python==5.1.0.95
+numpy==2.5.5
+imageio-ffmpeg==0.8.1

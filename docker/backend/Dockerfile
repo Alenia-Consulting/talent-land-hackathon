@@ -1,4 +1,10 @@
-FROM python:3.13-alpine
+# Debian, not Alpine: opencv, numpy and imageio-ffmpeg ship glibc wheels that musl cannot install.
+FROM python:3.13-slim
+
+# opencv-python loads libGL and libglib when imported, and the slim image ships neither.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends libgl1 libglib2.0-0 \
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 

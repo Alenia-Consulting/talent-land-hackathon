@@ -1,14 +1,15 @@
 """Uploading the recording.
 
-The video goes through the API, gets its faces blurred and only then reaches storage. While the
-blurring is not implemented the endpoint refuses the upload instead of storing recognisable faces.
+The video goes through the API, gets its faces blurred and only then reaches storage. If the
+blurring cannot run the endpoint refuses the upload instead of storing recognisable faces.
 """
 
 import io
 import pathlib
 import uuid
 
-from media import pipeline, storage
+from media import faces, pipeline, storage
+from media_fixtures import make_video
 
 
 def upload(client, guide_id, *, content=b"fake video bytes", content_type="video/mp4"):
@@ -49,16 +50,32 @@ def test_a_video_over_the_limit_is_refused_without_reading_it_all(
     assert response.status_code == 413
 
 
-def test_the_upload_is_refused_while_faces_cannot_be_blurred(client, db_session, make_guide):
+def test_the_upload_is_refused_when_faces_cannot_be_blurred(client, db_session, make_guide, monkeypatch):
     guide = make_guide()
     db_session.add(guide)
     db_session.commit()
 
+    def unavailable(video, steps):
+        raise pipeline.ProcessingUnavailable("ffmpeg no está disponible en este servidor")
+
+    monkeypatch.setattr("media.pipeline.process", unavailable)
+
     response = upload(client, guide.id)
 
-    # 503, not 500: nothing is broken, the capability is simply not there yet.
+    # 503, not 500: nothing is broken in the request, the capability is missing on this server.
     assert response.status_code == 503
-    assert "difumin" in response.json()["detail"].lower()
+    assert "ffmpeg" in response.json()["detail"]
+
+
+def test_something_that_looks_like_a_video_but_is_not_one_is_unprocessable(client, db_session, make_guide):
+    guide = make_guide()
+    db_session.add(guide)
+    db_session.commit()
+
+    response = upload(client, guide.id, content=b"not really a video" * 50)
+
+    assert response.status_code == 422
+    assert "vídeo" in response.json()["detail"]
 
 
 def test_the_recording_is_never_left_behind_on_disk(client, db_session, make_guide, tmp_path, monkeypatch):
@@ -73,14 +90,37 @@ def test_the_recording_is_never_left_behind_on_disk(client, db_session, make_gui
     assert list(tmp_path.iterdir()) == []
 
 
-def test_the_processing_step_states_what_it_needs_to_do():
-    """The blur is a hole somebody is going to fill: it must fail loudly, never silently pass."""
-    try:
-        pipeline.process(pathlib.Path("/tmp/none.mp4"), [])
-    except pipeline.ProcessingUnavailable as error:
-        assert "blur" in str(error).lower() or "difumin" in str(error).lower()
-    else:
-        raise AssertionError("process() must refuse until the blurring exists")
+def test_a_real_recording_is_blurred_before_anything_reaches_storage(
+    client, db_session, make_guide, make_step, monkeypatch, tmp_path
+):
+    """No fakes in the pipeline: the clip and the photo that reach storage have no face in them."""
+    import cv2
+    import numpy as np
+
+    guide = make_guide(public_slug="centro-oeste")
+    guide.steps = [make_step(position=1, start_seconds=0.0, end_seconds=2.0, photo_second=1.0)]
+    db_session.add(guide)
+    db_session.commit()
+
+    monkeypatch.setattr("routers.guides.UPLOAD_DIR", tmp_path / "uploads")
+    monkeypatch.setattr(
+        "media.storage.config_from_env",
+        lambda: storage.StorageConfig(url="https://p.supabase.co", key="k", bucket="guides"),
+    )
+    stored = {}
+    monkeypatch.setattr(
+        "media.storage.upload",
+        lambda config, path, data, content_type, **kwargs: stored.__setitem__(path, data) or f"https://x/{path}",
+    )
+    recording = make_video(tmp_path / "recording.mp4", seconds=2).read_bytes()
+
+    response = upload(client, guide.id, content=recording)
+
+    assert response.status_code == 200, response.text
+    assert set(stored) == {"centro-oeste/paso-1.mp4", "centro-oeste/paso-1.jpg"}
+    photo = cv2.imdecode(np.frombuffer(stored["centro-oeste/paso-1.jpg"], np.uint8), cv2.IMREAD_COLOR)
+    assert faces.find_faces(photo) == []
+    assert list((tmp_path / "uploads").iterdir()) == []
 
 
 def test_the_processed_media_reaches_storage_and_the_steps(
