@@ -37,15 +37,16 @@ spec:
             initialDelaySeconds: 5
             periodSeconds: 10
           resources:
-            # Blurring faces runs the detector on every frame. Measured in this image on a 2 minute
-            # 720x1280 recording: about 240 s with 2 CPUs and 150 s with 4, against the 300 s the
-            # ingress waits. Memory peaked around 330 MB. One recording is processed at a time (a
-            # lock in media/pipeline.py), so a second upload waits for the first.
+            # Blurring faces runs the detector on every 2nd frame at 640 px. Measured in this image
+            # with 2 CPUs on a 2 minute 1280x720 recording: about 30 s, against the 300 s the ingress
+            # waits (a portrait phone recording costs more, around 2-3x). Memory peaked around 150 MB.
+            # One recording is processed at a time (a lock in media/pipeline.py), so a second upload
+            # waits for the first.
             requests:
               cpu: "1000m"
               memory: "512Mi"
             limits:
-              cpu: "4000m"
+              cpu: "2000m"
               memory: "1Gi"
       imagePullSecrets:
         - name: github-registry-alenia-secret
