@@ -3,6 +3,9 @@
 Routes and business logic call this module; they never touch the ORM session or raw SQL. That keeps
 the database mockable in the CI, which runs without PostgreSQL.
 
+The route is not detected by the AI. The person picks the parts before recording and taps
+"Llegue a: X" when reaching each one; those marks are what this module turns into steps.
+
 Nothing here commits: the caller owns the transaction (in FastAPI, the get_session dependency).
 """
 
@@ -19,20 +22,65 @@ from db.models import Guide, Step
 
 DEFAULT_PAGE_SIZE = 20
 
+# The recording screen asks the person to stand still for 3 seconds on arrival. The clearest frame
+# is in the middle of that pause, and that is also the stretch where the noise is measured.
+PAUSE_SECONDS = 3.0
+MIN_MARKS = 2
+
 
 def create(
     session: Session,
     *,
+    title: str,
     venue_name: str,
-    steps: Iterable[dict],
+    marks: Iterable[dict],
+    video_duration_seconds: float,
     language: str = "es",
 ) -> Guide:
-    """Store a new guide as a draft. Only a human publishes it later."""
-    guide = Guide(venue_name=venue_name, language=language, status="draft")
+    """Store a new guide as a draft, with one step per mark.
+
+    The steps have no text yet: Gemini writes it afterwards and a person reviews it. Only a human
+    publishes the result.
+    """
+    steps = _steps_from_marks(marks, video_duration_seconds)
+    guide = Guide(
+        title=title,
+        venue_name=venue_name,
+        language=language,
+        status="draft",
+        video_duration_seconds=video_duration_seconds,
+    )
     guide.steps = [Step(**step) for step in steps]
     session.add(guide)
     session.flush()
     return guide
+
+
+def _steps_from_marks(marks: Iterable[dict], video_duration_seconds: float) -> list[dict]:
+    """Turn the marks into stretches of video: each step runs until the next mark."""
+    marks = list(marks)
+    if len(marks) < MIN_MARKS:
+        raise ValueError("a route needs at least two marks")
+
+    times = [mark["marked_at_seconds"] for mark in marks]
+    if any(later <= earlier for earlier, later in zip(times, times[1:], strict=False)):
+        raise ValueError("marks must move forward in time")
+    if video_duration_seconds <= times[-1]:
+        raise ValueError("the video ends before the last mark")
+
+    ends = [*times[1:], video_duration_seconds]
+    return [
+        {
+            "position": position,
+            "title": mark["title"],
+            "category": mark["category"],
+            "start_seconds": mark["marked_at_seconds"],
+            "end_seconds": end,
+            # Clamped, because a step can be shorter than the pause itself.
+            "photo_second": min(mark["marked_at_seconds"] + PAUSE_SECONDS / 2, end),
+        }
+        for position, (mark, end) in enumerate(zip(marks, ends, strict=False), start=1)
+    ]
 
 
 def get(session: Session, guide_id: uuid.UUID) -> Guide | None:
@@ -53,17 +101,33 @@ def list_guides(
     session: Session, *, limit: int = DEFAULT_PAGE_SIZE, offset: int = 0
 ) -> list[Guide]:
     """One page of guides, most recent first. Never the whole table."""
-    statement = (
-        select(Guide).order_by(Guide.created_at.desc()).limit(limit).offset(offset)
-    )
+    statement = select(Guide).order_by(Guide.created_at.desc()).limit(limit).offset(offset)
     return list(session.scalars(statement))
 
 
-def publish(session: Session, guide: Guide) -> Guide:
-    """Mark a reviewed guide as published and stamp the review date.
+def pending_before_publishing(guide: Guide) -> dict:
+    """What the panel shows as "3 de 5 pasos revisados" and "2 datos por completar"."""
+    return {
+        "steps_total": len(guide.steps),
+        "steps_reviewed": sum(1 for step in guide.steps if step.reviewed),
+        "missing_data": sum(1 for step in guide.steps if _data_is_missing(step)),
+    }
 
-    The public guide always shows that date, so visitors know how fresh the route is.
+
+def _data_is_missing(step: Step) -> bool:
+    return bool(step.missing_fields) or not step.easy_read_text
+
+
+def publish(session: Session, guide: Guide) -> Guide:
+    """Approve a reviewed guide and open its public link.
+
+    Refuses while any step is unreviewed or still has blanks: the panel keeps "Aprobar y publicar"
+    disabled in that state, and the rule belongs here rather than in the button.
     """
+    pending = pending_before_publishing(guide)
+    if pending["missing_data"] or pending["steps_reviewed"] < pending["steps_total"]:
+        raise ValueError("the guide is not ready to publish")
+
     if guide.public_slug is None:
         guide.public_slug = _unique_slug(session, guide.venue_name)
     guide.status = "published"
@@ -84,3 +148,23 @@ def _unique_slug(session: Session, venue_name: str) -> str:
         suffix += 1
         slug = f"{base}-{suffix}"
     return slug
+
+
+def update_step(
+    session: Session, guide: Guide, step_id: uuid.UUID, changes: dict
+) -> Step | None:
+    """Apply the panel's edits to one step of this guide.
+
+    Setting the noise level by hand marks it as "manual": the panel shows whether the value came
+    from the measurement or from a person.
+    """
+    step = next((candidate for candidate in guide.steps if candidate.id == step_id), None)
+    if step is None:
+        return None
+
+    if "noise_level" in changes:
+        step.noise_level_source = "manual"
+    for field, value in changes.items():
+        setattr(step, field, value)
+    session.flush()
+    return step

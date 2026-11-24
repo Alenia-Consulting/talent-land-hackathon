@@ -7,15 +7,23 @@ throwaway schema for a single test; the real schema is only ever changed by Alem
 import uuid
 
 import pytest
+from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
+from sqlalchemy.pool import StaticPool
 
 from db.models import Base, Guide, Step
 
 
 @pytest.fixture
 def db_session():
-    engine = create_engine("sqlite://")
+    # StaticPool keeps one connection for the whole engine: TestClient runs the app in another
+    # thread, and a second connection to "sqlite://" would open a different, empty database.
+    engine = create_engine(
+        "sqlite://",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
     Base.metadata.create_all(engine)
     with Session(engine) as session:
         yield session
@@ -26,6 +34,7 @@ def db_session():
 def make_guide():
     def build(**overrides) -> Guide:
         values = {
+            "title": "Recorrido principal",
             "venue_name": "Centro de salud Trinidad",
             "public_slug": f"slug-{uuid.uuid4().hex}",
         }
@@ -51,3 +60,15 @@ def make_step():
         return Step(**values)
 
     return build
+
+
+@pytest.fixture
+def client(db_session):
+    """HTTP client whose routes use the in-memory test session instead of PostgreSQL."""
+    import main
+    from db.session import get_session
+
+    main.app.dependency_overrides[get_session] = lambda: db_session
+    with TestClient(main.app) as test_client:
+        yield test_client
+    main.app.dependency_overrides.clear()

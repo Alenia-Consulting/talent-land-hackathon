@@ -112,3 +112,77 @@ def test_deleting_a_guide_deletes_its_steps(db_session, make_guide, make_step):
     db_session.commit()
 
     assert db_session.query(Step).count() == 0
+
+
+def test_a_guide_has_its_own_title_besides_the_venue(db_session, make_guide, make_step):
+    """A venue has several guides: "Recorrido principal", "Sala de rayos X"."""
+    db_session.add(make_guide(title="Sala de rayos X", venue_name="Clinica Dental Alameda"))
+    db_session.commit()
+
+    saved = db_session.query(Guide).one()
+    assert (saved.title, saved.venue_name) == ("Sala de rayos X", "Clinica Dental Alameda")
+
+
+def test_a_published_guide_can_go_back_to_needing_review(db_session, make_guide, make_step):
+    """The venue changed: the panel shows "Revisar cambios" until someone looks again."""
+    saved = make_guide(status="needs_review")
+    db_session.add(saved)
+    db_session.commit()
+
+    assert db_session.query(Guide).one().status == "needs_review"
+
+
+def test_a_step_records_which_data_the_ai_left_blank(db_session, make_guide, make_step):
+    """The panel shows "Falta: a quien pedir ayuda" and blocks publishing until it is filled."""
+    saved = make_guide()
+    saved.steps = [make_step(missing_fields=["who_to_ask_for_help", "duration_text"])]
+    db_session.add(saved)
+    db_session.commit()
+    db_session.expire_all()
+
+    assert db_session.query(Step).one().missing_fields == [
+        "who_to_ask_for_help",
+        "duration_text",
+    ]
+
+
+def test_a_fresh_step_is_not_reviewed_and_has_no_missing_data(db_session, make_guide, make_step):
+    saved = make_guide()
+    saved.steps = [make_step()]
+    db_session.add(saved)
+    db_session.commit()
+
+    step = db_session.query(Step).one()
+    assert step.reviewed is False
+    assert step.missing_fields == []
+    assert step.duration_text is None
+
+
+def test_the_noise_level_remembers_if_a_person_corrected_it(db_session, make_guide, make_step):
+    """The panel shows "Nivel de ruido - medido", and the venue may override it."""
+    saved = make_guide()
+    saved.steps = [make_step(noise_level="noisy", noise_level_source="manual")]
+    db_session.add(saved)
+    db_session.commit()
+
+    assert db_session.query(Step).one().noise_level_source == "manual"
+
+
+def test_the_noise_level_source_must_be_known(db_session, make_guide, make_step):
+    saved = make_guide()
+    saved.steps = [make_step(noise_level="noisy", noise_level_source="guessed")]
+    db_session.add(saved)
+
+    with pytest.raises(IntegrityError):
+        db_session.commit()
+
+
+def test_a_step_carries_the_interests_it_answers(db_session, make_guide, make_step):
+    """Drives the "Que quieres ver antes?" filter: a step can answer several interests."""
+    saved = make_guide()
+    saved.steps = [make_step(interests=["where_to_wait", "who_to_ask"])]
+    db_session.add(saved)
+    db_session.commit()
+    db_session.expire_all()
+
+    assert db_session.query(Step).one().interests == ["where_to_wait", "who_to_ask"]
