@@ -35,7 +35,7 @@ def test_every_step_becomes_a_clip_and_a_photo_without_faces(tmp_path):
     for step in steps:
         assert step.clip[4:8] == b"ftyp"  # a real mp4
         frames = frames_of(step.clip, tmp_path)
-        assert 25 <= len(frames) <= 35  # 2 s at 15 fps
+        assert 2 * video_io.FPS - 3 <= len(frames) <= 2 * video_io.FPS + 3  # 2 s
         # Not just the first frame: the middle and the last are clean too.
         for frame in (frames[0], frames[len(frames) // 2], frames[-1]):
             assert faces.find_faces(frame) == []
