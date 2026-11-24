@@ -129,10 +129,10 @@ export function SendingScreen({ progress }: { progress: number }) {
   );
 }
 
-export function DoneScreen() {
+export function DoneScreen({ videoSent }: { videoSent: boolean }) {
   return (
     <Message title={es.hecho.title}>
-      <p className="text-lg text-niebla/80">{es.hecho.lead}</p>
+      <p className="text-lg text-niebla/80">{videoSent ? es.hecho.leadSent : es.hecho.lead}</p>
     </Message>
   );
 }

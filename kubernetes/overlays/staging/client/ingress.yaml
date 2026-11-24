@@ -4,6 +4,9 @@ metadata:
   name: talent-land-hackathon
   annotations:
     cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    # ingress-nginx also defaults to 1 MB and sits in front of the container nginx. Recordings are
+    # up to 50 MB (the Supabase Storage limit).
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
 spec:
   ingressClassName: nginx
   tls:

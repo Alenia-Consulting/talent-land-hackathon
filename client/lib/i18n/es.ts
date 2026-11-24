@@ -45,6 +45,7 @@ export const es = {
     noAlerts: "Sin avisos de calidad.",
     interrupted: "La grabación se detuvo porque la app pasó a segundo plano.",
     limit: "Se alcanzó el límite de 2 minutos.",
+    tooBig: "El vídeo pesa más de 50 MB y no se puede enviar. Repite la grabación.",
     alertsTitle: "Avisos durante la grabación",
     darkSegments: (n: number) => plural(n, "tramo oscuro", "tramos oscuros"),
     fastSegments: (n: number) => plural(n, "tramo rápido", "tramos rápidos"),
@@ -55,6 +56,7 @@ export const es = {
     // The video is not uploaded yet: saying it was sent would be a lie, and the person would lose
     // the only copy. Offer the download instead until the API accepts files.
     lead: "Se guardó el recorrido con sus partes. El vídeo todavía no se envía: descárgalo para no perderlo.",
+    leadSent: "Se guardó el recorrido y se envió el vídeo. Ya puedes revisar la guía.",
     review: "Revisar la guía",
     again: "Grabar otro",
   },
