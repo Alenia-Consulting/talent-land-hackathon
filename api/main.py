@@ -20,4 +20,4 @@ def health_db():
         ping()
     except (RuntimeError, SQLAlchemyError) as exc:
         raise HTTPException(status_code=503, detail="database unavailable") from exc
-    return {"status": "ok", "database": "ok"}
+    return {"status": "ok", "database": "ok" }
