@@ -92,9 +92,9 @@ export const es = {
   enviando: { title: "Enviando el vídeo…", keepOpen: "No cierres esta pantalla." },
   hecho: {
     title: "¡Listo!",
-    // The video is not uploaded yet: saying it was sent would be a lie, and the person would lose
-    // the only copy. Offer the download instead until the API accepts files.
-    lead: "Se guardó el recorrido con sus partes. El vídeo todavía no se envía: descárgalo para no perderlo.",
+    // Only when the video did NOT get through. Saying it was sent would be a lie, and the person
+    // would lose the only copy, so the download is offered instead.
+    lead: "Se guardó el recorrido con sus partes. El vídeo no se ha enviado: descárgalo para no perderlo.",
     leadSent: "Se guardó el recorrido y se envió el vídeo. Ya puedes revisar la guía.",
     review: "Revisar la guía",
     again: "Grabar otro",

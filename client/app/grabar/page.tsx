@@ -179,7 +179,8 @@ export default function GrabarPage() {
         await uploadVideo(id, input, setProgress);
         setVideoSent(true);
       } catch (cause) {
-        // 503: the API cannot process video yet. The guide is saved and the video stays on the device.
+        // 503: that deployment cannot process video. The guide is saved, the video stays on the
+        // device, and the done screen offers the download instead of claiming it was sent.
         if (!(cause instanceof VideoUploadError && cause.status === 503)) throw cause;
       }
       setPhase("hecho");
