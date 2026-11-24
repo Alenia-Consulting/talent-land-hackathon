@@ -1,26 +1,59 @@
 @import "tailwindcss";
 
-/* Brand tokens (Marca v1). Low saturation on purpose: nothing shouts, nothing blinks. */
+/* Brand tokens (Marca v1). Low saturation on purpose: nothing shouts, nothing blinks.
+   Every token is a role, not a colour, so dim mode is a redefinition and not a second stylesheet:
+   `bg-pino` means "the action colour", and below it stops being green. */
 @theme {
   --color-pino: #1f5d50; /* action */
+  --color-sobre-pino: #ffffff; /* text and icons that sit on the action colour */
   --color-tinta: #15302b; /* text */
   --color-salvia: #ddebe5; /* surface */
-  --color-niebla: #f4f6f3; /* background */
+  --color-niebla: #f4f6f3; /* page background */
+  --color-tarjeta: #ffffff; /* cards, which are not the page */
   --color-ambar: #f2b45a; /* gentle warning */
+  --color-sobre-ambar: #7a4b00; /* text on an amber surface */
   --color-coral: #c24e33; /* recording only */
+  --color-sobre-coral: #9c3a22; /* text on a coral surface */
 
   /* The -loaded variables come from next/font in app/layout.tsx. The fallbacks keep the layout
-     sane if a font never arrives. Atkinson Hyperlegible was drawn for legibility, which is the
-     whole point of this product. */
+     sane if a font never arrives. Atkinson Hyperlegible Next was drawn for legibility, which is
+     the whole point of this product. */
   --font-titulo: var(--font-titulo-loaded), system-ui, sans-serif;
   --font-texto: var(--font-texto-loaded), system-ui, sans-serif;
+}
+
+/* Dim mode ("modo tenue"), for whom light hurts. A dark background that is not pure black and a
+   text that is not pure white: maximum contrast is painful, not accessible. The action colour
+   becomes mint, because dark green on a dark background is a button nobody can find. */
+:root[data-theme="tenue"] {
+  --color-pino: #8fd9c0;
+  --color-sobre-pino: #0e1714;
+  --color-tinta: #e9f1ed;
+  --color-salvia: #1e2f29;
+  --color-niebla: #0e1714;
+  --color-tarjeta: #17241f;
+  --color-ambar: #e2a858;
+  --color-sobre-ambar: #f6d7a4;
+  --color-coral: #d2654a;
+  --color-sobre-coral: #f0b3a2;
+}
+
+/* Text size, chosen by the person. Medium is 1, so the design's 20–22 px is the unscaled case. */
+:root {
+  --escala-texto: 1;
+}
+:root[data-text="s"] {
+  --escala-texto: 0.9;
+}
+:root[data-text="l"] {
+  --escala-texto: 1.2;
 }
 
 body {
   margin: 0;
   /* Easy read sits at 20–22 px, so the base size is larger than a usual web default. */
   font-family: var(--font-texto);
-  font-size: 1.25rem;
+  font-size: calc(1.25rem * var(--escala-texto));
   line-height: 1.6;
   background: var(--color-niebla);
   color: var(--color-tinta);
@@ -31,6 +64,12 @@ h2,
 h3 {
   font-family: var(--font-titulo);
   line-height: 1.15;
+}
+
+/* A visible focus ring everywhere: this guide is used with a keyboard and with a switch. */
+:where(a, button, input, textarea, select, [tabindex]):focus-visible {
+  outline: 3px solid var(--color-pino);
+  outline-offset: 2px;
 }
 
 /* Nothing moves on its own: no transitions, and no animation for anyone who asked for less. */
