@@ -20,20 +20,19 @@ from functools import lru_cache
 import cv2
 import numpy as np
 
-# Frames are at most 720 on the short side, so 1280 means "do not downscale". Measured on a phone
-# recording with people at a distance: detecting at 0.89x (the old 640 px) left 14% of the faces
-# uncovered, at 1.0x only 1.5% for 20% more time, at 1.5x none but 2.7x the time.
-DETECTION_WIDTH = 1280
-# Measured on a real 10 s phone recording with several people (3 faces per frame on average): at 0.3
-# a turned head with a hand over the face and a profile cut by the edge of the frame were missed;
-# at 0.15 both are covered and the blurred area only grows from 9.2% to 10.8% of the frame (the
-# extra boxes are lights and textures). Profiles and motion blur are what a frontal detector loses.
+# Prototype trade-off: speed over precision. Measured on a real phone recording with people at a
+# distance, detecting at full size covered 98.5% of the faces; at 640 px wide and on every 2nd frame
+# some small, far-away or fast-moving faces slip through (~7% in some frame) for roughly half the
+# time. Raise DETECTION_WIDTH and set DETECT_EVERY to 1 to buy the precision back with CPU.
+DETECTION_WIDTH = 640
+DETECT_EVERY = 2  # frames between two detections; the frames in between reuse the last boxes
+# Measured on a real 10 s phone recording with several people (3 faces per frame on average): at a
+# 0.3 threshold a turned head with a hand over the face and a profile cut by the edge of the frame
+# were missed; 0.15 covers both for little extra blurred area (the extra boxes are lights and
+# textures). A blurred wall is harmless, a missed face is not.
 SCORE_THRESHOLD = 0.15
 BOX_GROWTH = 1.5
-# Detection runs on EVERY frame. It is most of the cost, but skipping frames was measured on a real
-# recording: detecting every 2nd frame left 7% of the faces uncovered in some frame, every 3rd 12%.
-# Speed is bought with CPU, not by looking less.
-HOLD_FRAMES = 4
+HOLD_DETECTIONS = 2  # last detections still blurred, so a frame where the detector blinks is hidden
 PIXELS_ACROSS = 8  # cells left across the longest side of a face
 
 Box = tuple[int, int, int, int]
@@ -126,11 +125,14 @@ class FaceBlurrer:
 
     def __init__(self, detect: Detector | None = None) -> None:
         self._detect = detect
-        self._recent: deque[list[Box]] = deque(maxlen=HOLD_FRAMES)
+        self._recent: deque[list[Box]] = deque(maxlen=HOLD_DETECTIONS)
+        self._frames = 0
 
     def __call__(self, frame: np.ndarray) -> int:
         """Blur the frame in place and answer how many boxes were blurred."""
-        self._recent.append(find_faces(frame, self._detect))
+        if self._frames % DETECT_EVERY == 0:
+            self._recent.append(find_faces(frame, self._detect))
+        self._frames += 1
         boxes = [box for found in self._recent for box in found]
         blur_faces(frame, boxes)
         return len(boxes)

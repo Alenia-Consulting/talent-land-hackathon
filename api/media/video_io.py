@@ -17,7 +17,7 @@ import numpy as np
 
 from media.errors import ProcessingFailed, ProcessingUnavailable
 
-FPS = 15
+FPS = 12
 MAX_SHORT_SIDE = 720
 
 Size = tuple[int, int]

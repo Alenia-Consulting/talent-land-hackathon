@@ -71,7 +71,7 @@ def test_a_frame_where_the_detector_misses_is_still_blurred():
     blurrer(first)
     blurrer(missed)
 
-    # The second frame found nothing, yet the face found one frame earlier is hidden in it too.
+    # The second frame is not even looked at, yet the face found one frame earlier is hidden in it.
     assert not np.array_equal(missed[120:200, 220:280], noise[120:200, 220:280])
 
 
@@ -79,7 +79,7 @@ def test_the_hold_expires_so_old_boxes_do_not_blur_forever():
     noise = np.random.default_rng(2).integers(0, 255, (360, 640, 3), dtype=np.uint8)
     blurrer = faces.FaceBlurrer(fake_detector([(200, 100, 300, 220)]))
     blurrer(noise.copy())
-    for _ in range(faces.HOLD_FRAMES):
+    for _ in range(faces.HOLD_DETECTIONS * faces.DETECT_EVERY):
         late = noise.copy()
         blurrer(late)
 
@@ -98,16 +98,28 @@ def test_boxes_that_only_touch_through_a_third_are_still_merged():
     assert merged == [(0, 0, 60, 20)]
 
 
-def test_the_detector_sees_the_frame_at_full_size():
-    """Downscaling the frame before detecting loses the small faces of people further away: on a
-    phone recording, 640 px of width left 14% of them uncovered. Frames are at most 720p."""
+def test_the_detector_gets_a_downscaled_frame_and_boxes_come_back_in_frame_pixels():
     seen = []
 
     def spy(image, threshold):
         seen.append(image.shape[:2])
+        return np.array([[10, 20, 30, 40, 0.9]], np.float32), np.empty((1, 10), np.float32)
+
+    found = faces.find_faces(np.zeros((720, 1280, 3), np.uint8), spy)
+
+    assert seen == [(360, 640)]
+    assert found == [(20, 40, 60, 80)]
+
+
+def test_frames_between_two_detections_are_not_analysed():
+    calls = []
+
+    def spy(image, threshold):
+        calls.append(1)
         return np.empty((0, 5), np.float32), np.empty((0, 10), np.float32)
 
-    for height, width in ((1280, 720), (720, 1280)):
-        faces.find_faces(np.zeros((height, width, 3), np.uint8), spy)
+    blurrer = faces.FaceBlurrer(spy)
+    for _ in range(4):
+        blurrer(np.zeros((360, 640, 3), np.uint8))
 
-    assert seen == [(1280, 720), (720, 1280)]
+    assert len(calls) == 4 // faces.DETECT_EVERY
