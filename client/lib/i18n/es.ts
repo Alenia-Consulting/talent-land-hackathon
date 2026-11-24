@@ -252,6 +252,35 @@ export const es = {
       unavailable: "Esta parte todavía no tiene el sonido del sitio.",
     },
   },
+  // Lo que ve el centro cuando la guía ya está publicada: cómo se comparte.
+  // El cartel que se imprime y se pega en recepción.
+  cartel: {
+    title: "Este centro tiene Antesala",
+    lead: "Mira cómo es por dentro antes de venir.",
+    how: "Apunta con la cámara del móvil. Se abre sola, no hay que instalar nada.",
+    what: ["Fotos reales de cada zona", "Texto fácil de leer", "El sonido del sitio, si quieres"],
+    print: "Imprimir el cartel",
+    missing: "Falta el enlace de la guía en la dirección.",
+  },
+  compartir: {
+    open: "Compartir",
+    title: "Tu guía ya está en marcha",
+    lead: "Compártela antes de cada cita. Quien la abra no necesita instalar nada.",
+    qrLabel: (centro: string) => `Código QR de la guía de ${centro}`,
+    copy: "Copiar",
+    copied: "Enlace copiado",
+    sms: "Añadir al SMS de cita",
+    smsCopied: "Mensaje copiado",
+    // El texto que el centro pega en su SMS de recordatorio de cita.
+    smsText: (centro: string, enlace: string) =>
+      `Antes de tu cita puedes ver por dentro ${centro}, paso a paso y con fotos reales: ${enlace}`,
+    poster: "Cartel para recepción",
+    close: "Cerrar",
+    // La tarjeta de abajo es la vista previa del cartel, no un adorno.
+    signTitle: "Este centro tiene Antesala",
+    signReviewed: (fecha: string) => `Revisada el ${fecha} · la fecha se ve en la guía`,
+    signNeverReviewed: "Sin revisar todavía",
+  },
   ajustes: {
     title: "Ponlo a tu gusto",
     lead: "Cámbialo cuando quieras. Se guarda solo en este móvil.",

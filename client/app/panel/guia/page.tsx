@@ -19,17 +19,30 @@ import {
 } from "../../../lib/guides.ts";
 import { es } from "../../../lib/i18n/es.ts";
 import { countMissing } from "../../../lib/pure/review.ts";
-import { AlertIcon, CheckIcon } from "../../icons.tsx";
+import { AlertIcon, CheckIcon, QrIcon } from "../../icons.tsx";
 import { Button, Card, StatusChip } from "../../ui.tsx";
+import { ShareSheet } from "./share.tsx";
 import { StepForm } from "./step-form.tsx";
 
 const t = es.panel.detail;
+
+/** The date of the last human review, in the short form the design writes it. */
+function reviewedOn(iso: string | null | undefined): string | null {
+  if (!iso) return null;
+  const date = new Date(iso);
+  return Number.isNaN(date.getTime())
+    ? null
+    : date.toLocaleDateString("es-ES", { day: "numeric", month: "short", year: "numeric" });
+}
 
 function GuideDetail() {
   const id = useSearchParams().get("id");
   const [guide, setGuide] = useState<Guide | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // Opens by itself the moment a guide is published: the link and the QR are what the venue came
+  // for, and asking them to find a button after approving is a step with no purpose.
+  const [sharing, setSharing] = useState(false);
 
   const fail = useCallback((cause: unknown) => {
     setError(cause instanceof ApiError ? cause.message : String(cause));
@@ -55,7 +68,10 @@ function GuideDetail() {
     setBusy(true);
     setError(null);
     publishGuide(id)
-      .then(setGuide)
+      .then((published) => {
+        setGuide(published);
+        if (published.public_slug) setSharing(true);
+      })
       .catch(fail)
       .finally(() => setBusy(false));
   };
@@ -157,12 +173,21 @@ function GuideDetail() {
       )}
 
       {guide.status === "published" && guide.public_slug && (
-        <Card className="mt-4 bg-salvia">
-          <p className="font-bold">{t.published}</p>
-          <Link href={`/g?slug=${guide.public_slug}`} className="text-lg font-bold text-pino underline">
-            /g?slug={guide.public_slug}
-          </Link>
-        </Card>
+        <>
+          <Card className="mt-4 flex flex-wrap items-center justify-between gap-4 bg-salvia">
+            <p className="font-bold text-pino">{t.published}</p>
+            <Button icon={<QrIcon size={22} />} onClick={() => setSharing(true)}>
+              {es.compartir.open}
+            </Button>
+          </Card>
+          <ShareSheet
+            open={sharing}
+            onClose={() => setSharing(false)}
+            venue={guide.venue_name}
+            slug={guide.public_slug}
+            reviewed={reviewedOn(guide.reviewed_at)}
+          />
+        </>
       )}
 
       <ol className="mt-6 grid gap-4">
