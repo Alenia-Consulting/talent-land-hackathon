@@ -1,0 +1,57 @@
+:root {
+  --pino: #1f5d50;
+  --tinta: #15302b;
+  --salvia: #ddebe5;
+  --niebla: #f4f6f3;
+  --ambar: #f2b45a;
+  --coral: #c24e33;
+  --secundario: #4f625c;
+  --linea: #dce3de;
+  --linea-suave: #e6ebe8;
+
+  --bg: var(--niebla);
+  --superficie: #ffffff;
+  --texto: var(--tinta);
+  --texto-sec: var(--secundario);
+  --primario: var(--pino);
+  --sobre-primario: #ffffff;
+  --borde: var(--linea);
+  --chip: var(--salvia);
+
+  --ruido-tranquilo-bg: #ddebe5;
+  --ruido-tranquilo-fg: #1f5d50;
+  --ruido-medio-bg: #fbe7c6;
+  --ruido-medio-fg: #774604;
+  --ruido-ruidoso-bg: #f6d5ca;
+  --ruido-ruidoso-fg: #8a2e14;
+
+  --radio-boton: 18px;
+  --radio-tarjeta: 24px;
+  --alto-boton: 56px;
+
+  --fuente-titulo: 'Bricolage Grotesque', system-ui, sans-serif;
+  --fuente-texto: 'Atkinson Hyperlegible Next', system-ui, sans-serif;
+  --texto-lectura: 22px;
+}
+
+[data-tamano='0'] { --texto-lectura: 18px; }
+[data-tamano='1'] { --texto-lectura: 22px; }
+[data-tamano='2'] { --texto-lectura: 26px; }
+
+[data-tema='tenue'] {
+  --bg: #101c19;
+  --superficie: #1a2925;
+  --texto: #e6eeea;
+  --texto-sec: #b9c8c2;
+  --primario: #8fd1bc;
+  --sobre-primario: #0e1b17;
+  --borde: #2b3d38;
+  --chip: #24413a;
+  --salvia: #24413a;
+  --ruido-tranquilo-bg: #24413a;
+  --ruido-tranquilo-fg: #bfe6d9;
+  --ruido-medio-bg: #4a3a1c;
+  --ruido-medio-fg: #f3d9a4;
+  --ruido-ruidoso-bg: #4d2a20;
+  --ruido-ruidoso-fg: #f4c3b3;
+}

@@ -1,25 +1,16 @@
-# Environment files (secrets): only the templates are tracked
+node_modules/
+dist/
+.vite/
+*.log
 .env
 .env.*
 !.env.example
-
-node_modules/
-dist/
-
-# Byte-compiled / optimized / DLL files
-__pycache__/
-*.py[cod]
-*$py.class
-
-.pem
-
-# Python tooling
-.venv/
-.pytest_cache/
-.coverage
-
-# Next.js
-.next/
-out/
-next-env.d.ts
-*.tsbuildinfo
+.DS_Store
+Thumbs.db
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.claude/settings.local.json
+.claude/worktrees/
+*.mp4
+*.mov
