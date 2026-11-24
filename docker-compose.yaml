@@ -1,20 +1,4 @@
 services:
-  # Same image as kubernetes/overlays/staging/postgres. Reads POSTGRES_* from api/.env.
-  talent-land-hackathon-postgres:
-    image: postgres:15.18-alpine3.24
-    restart: unless-stopped
-    env_file:
-      - api/.env
-    volumes:
-      - pg-data:/var/lib/postgresql/data
-    ports:
-      - "${PG_PORT:-5432}:5432"
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
-      interval: 5s
-      timeout: 5s
-      retries: 10
-
   talent-land-hackathon-frontend:
     build:
       context: .
@@ -33,12 +17,6 @@ services:
       dockerfile: docker/backend/Dockerfile
     ports:
       - "${API_PORT:-8000}:8000"
-    # DATABASE_URL in api/.env must use the host "talent-land-hackathon-postgres".
+    # DATABASE_URL in api/.env points at Supabase (see api/.env.example).
     env_file:
       - api/.env
-    depends_on:
-      talent-land-hackathon-postgres:
-        condition: service_healthy
-
-volumes:
-  pg-data:

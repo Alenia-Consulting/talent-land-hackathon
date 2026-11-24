@@ -10,7 +10,8 @@ spec:
   template:
     metadata:
       annotations:
-        # Renders every key of the Vault secret (DATABASE_URL, ...) to /vault/secrets/.env,
+        # Renders every key of the Vault secret (DATABASE_URL pointing at Supabase, ...) to
+        # /vault/secrets/.env,
         # sourced by docker/backend/entrypoint.sh before migrations and uvicorn.
         vault.hashicorp.com/agent-inject: "true"
         vault.hashicorp.com/role: "talent-land-hackathon-staging"
