@@ -27,9 +27,18 @@ export const THEME_SCRIPT = `(function(){try{var p=JSON.parse(localStorage.getIt
 type PrefsContext = {
   prefs: Prefs;
   setPrefs: (change: Partial<Prefs>) => void;
+  /**
+   * Whether storage has been read yet. Before it has, `prefs` is the defaults rather than this
+   * person's choices, so a screen that only appears for a first visit must wait for it.
+   */
+  ready: boolean;
 };
 
-const Context = createContext<PrefsContext>({ prefs: DEFAULT_PREFS, setPrefs: () => {} });
+const Context = createContext<PrefsContext>({
+  prefs: DEFAULT_PREFS,
+  setPrefs: () => {},
+  ready: false,
+});
 
 function applyToDocument(prefs: Prefs): void {
   if (typeof document === "undefined") return;
@@ -42,12 +51,14 @@ function applyToDocument(prefs: Prefs): void {
 
 export function PrefsProvider({ children }: { children: ReactNode }) {
   const [prefs, setState] = useState<Prefs>(DEFAULT_PREFS);
+  const [ready, setReady] = useState(false);
 
   // Runs once in the browser: the server has no storage, so the first render cannot read it.
   useEffect(() => {
     const stored = readPrefs(globalThis.localStorage);
     setState(stored);
     applyToDocument(stored);
+    setReady(true);
   }, []);
 
   const setPrefs = useCallback((change: Partial<Prefs>) => {
@@ -59,7 +70,7 @@ export function PrefsProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
-  return <Context.Provider value={{ prefs, setPrefs }}>{children}</Context.Provider>;
+  return <Context.Provider value={{ prefs, setPrefs, ready }}>{children}</Context.Provider>;
 }
 
 export function usePrefs(): PrefsContext {

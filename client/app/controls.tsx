@@ -71,17 +71,20 @@ export function Segmented<T extends string>({
   value,
   options,
   onChange,
+  full,
 }: {
   label: string;
   value: T | null;
   options: readonly { value: T; label: ReactNode; title?: string }[];
   onChange: (next: T) => void;
+  /** Spans the width, for the two-way question the welcome asks. */
+  full?: boolean;
 }) {
   return (
     <div
       role="group"
       aria-label={label}
-      className="inline-flex gap-2 rounded-[18px] bg-salvia/60 p-1"
+      className={`gap-2 rounded-[18px] bg-salvia/60 p-1 ${full ? "flex" : "inline-flex"}`}
     >
       {options.map((option) => {
         const selected = option.value === value;
@@ -93,8 +96,8 @@ export function Segmented<T extends string>({
             title={option.title}
             onClick={() => onChange(option.value)}
             className={`min-h-12 min-w-14 rounded-[14px] px-4 text-base font-bold ${
-              selected ? "border-2 border-pino bg-tarjeta text-pino" : "text-tinta"
-            }`}
+              full ? "flex-1" : ""
+            } ${selected ? "border-2 border-pino bg-tarjeta text-pino" : "text-tinta"}`}
           >
             {option.label}
           </button>

@@ -269,6 +269,46 @@ export const es = {
     print: "Imprimir el cartel",
     missing: "Falta el enlace de la guía en la dirección.",
   },
+  // La bienvenida, la primera vez que alguien abre una guía. Se ve una vez y no vuelve.
+  bienvenida: {
+    skip: "Saltar",
+    back: "Atrás",
+    listen: "Escuchar",
+    step: (n: number, total: number) => `Paso ${n} de ${total}`,
+    welcome: {
+      title: "Mira el sitio antes de ir",
+      lead: "Verás y oirás cómo es cada parte del sitio de verdad. Así, cuando llegues, ya lo conoces.",
+      start: "Empezar",
+      free: "Gratis. Sin instalar nada. Sin cuenta.",
+    },
+    needs: {
+      title: "¿Para quién preparas la visita?",
+      who: { self: "Para mí", other: "Acompaño a alguien" },
+      // Cambia con "para mí / acompaño a alguien": es lo que hace ese interruptor. Un control
+      // que no cambia nada es un control que estorba.
+      question: "¿Qué te cuesta en un sitio nuevo?",
+      questionOther: "¿Qué le cuesta en un sitio nuevo?",
+      lead: "Elige las que quieras. Activamos lo que ayuda.",
+      // El subtítulo de cada opción dice solo lo que de verdad va a cambiar. Las dos que no
+      // cambian ningún ajuste cuentan lo que la guía ya hace para todo el mundo.
+      options: {
+        sight: { title: "Veo poco o nada", hint: "Letra grande y voz" },
+        hearing: { title: "Oigo poco o nada", hint: "Todo se puede leer. Nada suena sin que lo pidas." },
+        reading: { title: "Me cuesta leer o entender", hint: "Lectura fácil, pictogramas y voz" },
+        overload: { title: "El ruido o la luz me agobian", hint: "Modo tenue y aviso antes de cada sonido" },
+        wayfinding: { title: "Me pierdo o se me olvida el camino", hint: "Un paso por pantalla, y puedes volver atrás" },
+      },
+      privacy: "Sin diagnósticos. Se guarda solo en tu móvil.",
+      willChange: "Vas a empezar con:",
+      next: "Siguiente",
+      nothingYet: "Nada cambia todavía. Puedes ajustarlo tú en el paso siguiente.",
+    },
+    ready: {
+      title: "Ponlo a tu gusto",
+      lead: "Cámbialo cuando quieras, desde el botón Ajustes de la guía.",
+      start: "Empezar la visita",
+    },
+  },
   compartir: {
     open: "Compartir",
     title: "Tu guía ya está en marcha",

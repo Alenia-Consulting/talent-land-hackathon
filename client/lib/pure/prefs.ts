@@ -19,6 +19,8 @@ export type Prefs = {
   textSize: TextSize;
   readAloud: boolean;
   pictograms: boolean;
+  /** Whether this phone has been through the welcome. It is shown once, never again. */
+  onboarded: boolean;
 };
 
 export const DEFAULT_PREFS: Prefs = {
@@ -27,6 +29,7 @@ export const DEFAULT_PREFS: Prefs = {
   // Off by default: the guide offers it, the person turns it on. Nothing speaks unasked.
   readAloud: false,
   pictograms: true,
+  onboarded: false,
 };
 
 /** Multiplies the base font size. Medium is 1 so the design's 20–22 px is the unscaled case. */
@@ -72,6 +75,7 @@ export function readPrefs(storage: PrefsStorage | null | undefined): Prefs {
     textSize: pick(stored.textSize, SIZES, DEFAULT_PREFS.textSize),
     readAloud: bool(stored.readAloud, DEFAULT_PREFS.readAloud),
     pictograms: bool(stored.pictograms, DEFAULT_PREFS.pictograms),
+    onboarded: bool(stored.onboarded, DEFAULT_PREFS.onboarded),
   };
 }
 

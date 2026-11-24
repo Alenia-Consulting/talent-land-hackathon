@@ -217,6 +217,26 @@ export function EyeIcon({ size }: IconProps) {
   );
 }
 
+/** Hearing. The ear is drawn open, not crossed out: the list asks what helps, not what is wrong. */
+export function EarIcon({ size }: IconProps) {
+  return (
+    <Icon size={size}>
+      <path d="M6 9a6 6 0 0 1 12 0c0 3-2 4-3 5.5S13.5 18 13 20a2.5 2.5 0 0 1-4.6.6" />
+      <path d="M9.5 9a2.5 2.5 0 0 1 5 0c0 1.8-2 2.2-2 4" />
+    </Icon>
+  );
+}
+
+/** Finding the way. */
+export function CompassIcon({ size }: IconProps) {
+  return (
+    <Icon size={size}>
+      <circle cx="12" cy="12" r="9" />
+      <path d="m15.5 8.5-2 5-5 2 2-5z" />
+    </Icon>
+  );
+}
+
 export function PlusIcon({ size }: IconProps) {
   return (
     <Icon size={size}>

@@ -79,7 +79,13 @@ test("a storage that throws is survivable: private browsing must not blank the g
 
 test("what is written can be read back", () => {
   const storage = fakeStorage();
-  const wanted: Prefs = { theme: "tenue", textSize: "s", readAloud: true, pictograms: false };
+  const wanted: Prefs = {
+    theme: "tenue",
+    textSize: "s",
+    readAloud: true,
+    pictograms: false,
+    onboarded: true,
+  };
 
   writePrefs(wanted, storage);
 
@@ -90,4 +96,21 @@ test("every text size maps to a scale, and medium is the unscaled one", () => {
   assert.equal(TEXT_SCALE.m, 1);
   assert.ok(TEXT_SCALE.s < TEXT_SCALE.m);
   assert.ok(TEXT_SCALE.l > TEXT_SCALE.m);
+});
+
+test("a fresh phone has not seen the welcome", () => {
+  assert.equal(readPrefs(fakeStorage()).onboarded, false);
+});
+
+test("having seen the welcome is remembered like any other preference", () => {
+  const storage = fakeStorage();
+  writePrefs({ ...DEFAULT_PREFS, onboarded: true }, storage);
+
+  assert.equal(readPrefs(storage).onboarded, true);
+});
+
+test("a stored value that is not a boolean does not keep the welcome away", () => {
+  const storage = fakeStorage({ [STORAGE_KEY]: JSON.stringify({ onboarded: "sí" }) });
+
+  assert.equal(readPrefs(storage).onboarded, false);
 });

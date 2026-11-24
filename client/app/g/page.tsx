@@ -14,8 +14,10 @@ import { ApiError, type Guide, readPublicGuide } from "../../lib/guides.ts";
 import { es } from "../../lib/i18n/es.ts";
 import { ChevronLeftIcon } from "../icons.tsx";
 import { Button, Card, NoiseLevel } from "../ui.tsx";
+import { usePrefs } from "../prefs.tsx";
 import { Landing } from "./landing.tsx";
 import { Player } from "./player.tsx";
+import { Welcome } from "./welcome.tsx";
 
 const t = es.publica;
 
@@ -98,6 +100,10 @@ function PublicGuide() {
   const [error, setError] = useState<string | null>(null);
   const [view, setView] = useState<View>({ name: "landing" });
   const [chosen, setChosen] = useState<ReadonlySet<string>>(new Set());
+  const { prefs, ready } = usePrefs();
+  // Held separately from the stored flag so that finishing the welcome does not wait on a write
+  // to storage a private window may refuse.
+  const [welcomed, setWelcomed] = useState(false);
 
   useEffect(() => {
     if (!slug) return;
@@ -130,6 +136,11 @@ function PublicGuide() {
       </p>
     );
   if (!guide) return <p className="text-tinta/70">{t.loading}</p>;
+
+  // Only once the stored preferences have been read: showing the welcome to somebody who has
+  // already answered it, for the one frame before storage comes back, is worse than a blank.
+  if (ready && !prefs.onboarded && !welcomed)
+    return <Welcome onDone={() => setWelcomed(true)} />;
 
   if (view.name === "player" && steps.length > 0)
     return (

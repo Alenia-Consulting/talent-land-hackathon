@@ -19,14 +19,17 @@ const t = es.ajustes;
 /** A sentence of a real guide, so the size is judged on the text it will actually be used for. */
 const PREVIEW = "Llegas al mostrador azul. Dices tu nombre.";
 
-export function SettingsSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
+/**
+ * The controls themselves, without the sheet around them.
+ *
+ * The welcome shows the same ones on its last screen: one definition of what can be changed, so
+ * the settings a person meets on their first visit are the settings they find again later.
+ */
+export function SettingsControls() {
   const { prefs, setPrefs } = usePrefs();
 
   return (
-    <Sheet open={open} onClose={onClose} title={t.title}>
-      <h2 className="text-3xl font-extrabold">{t.title}</h2>
-      <p className="mt-1 text-tinta/70">{t.lead}</p>
-
+    <>
       <Card className="mt-5">
         <p className="text-base font-bold tracking-widest text-pino uppercase">{t.preview}</p>
         <p className="mt-2 text-2xl">{PREVIEW}</p>
@@ -80,6 +83,17 @@ export function SettingsSheet({ open, onClose }: { open: boolean; onClose: () =>
           lockedIcon={<LockIcon size={26} />}
         />
       </Card>
+    </>
+  );
+}
+
+export function SettingsSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
+  return (
+    <Sheet open={open} onClose={onClose} title={t.title}>
+      <h2 className="text-3xl font-extrabold">{t.title}</h2>
+      <p className="mt-1 text-tinta/70">{t.lead}</p>
+
+      <SettingsControls />
 
       <div className="mt-6">
         <Button full onClick={onClose}>
