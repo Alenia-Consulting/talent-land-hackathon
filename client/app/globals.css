@@ -1,13 +1,46 @@
-body {
-  margin: 0;
-  font-family: system-ui, sans-serif;
+@import "tailwindcss";
+
+/* Brand tokens (Marca v1). Low saturation on purpose: nothing shouts, nothing blinks. */
+@theme {
+  --color-pino: #1f5d50; /* action */
+  --color-tinta: #15302b; /* text */
+  --color-salvia: #ddebe5; /* surface */
+  --color-niebla: #f4f6f3; /* background */
+  --color-ambar: #f2b45a; /* gentle warning */
+  --color-coral: #c24e33; /* recording only */
+
+  /* The -loaded variables come from next/font in app/layout.tsx. The fallbacks keep the layout
+     sane if a font never arrives. Atkinson Hyperlegible was drawn for legibility, which is the
+     whole point of this product. */
+  --font-titulo: var(--font-titulo-loaded), system-ui, sans-serif;
+  --font-texto: var(--font-texto-loaded), system-ui, sans-serif;
 }
 
-main {
-  min-height: 100vh;
-  display: grid;
-  place-content: center;
-  justify-items: center;
+body {
+  margin: 0;
+  /* Easy read sits at 20–22 px, so the base size is larger than a usual web default. */
+  font-family: var(--font-texto);
+  font-size: 1.25rem;
+  line-height: 1.6;
+  background: var(--color-niebla);
+  color: var(--color-tinta);
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-titulo);
+  line-height: 1.15;
+}
+
+/* Nothing moves on its own: no transitions, and no animation for anyone who asked for less. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 
 .health {

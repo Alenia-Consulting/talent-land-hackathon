@@ -8,5 +8,5 @@ const indexHtml = new URL("../out/index.html", import.meta.url);
 test("home page shows the application name", async () => {
   const html = await readFile(indexHtml, "utf8");
   assert.match(html, /<title>Antesala<\/title>/);
-  assert.match(html, /<h1>Antesala<\/h1>/);
+  assert.match(html, /<h1[^>]*>Antesala<\/h1>/);
 });

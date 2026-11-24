@@ -1,0 +1,1209 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Antesala API",
+    "summary": "Anticipation guides: a recorded route a person can watch before visiting a place.",
+    "description": "Shared contract for the recorder (mobile), the review panel and the public player.\n\nThe route is **not** detected by the AI: the person picks the parts before recording and taps \"Llegue a: X\" on arrival. Those marks become the steps.\n\nTwo rules the API enforces, not the UI:\n- a guide is only published by a human, and only once every step is reviewed and complete\n- the public endpoint never serves a draft",
+    "version": "0.0.1"
+  },
+  "servers": [
+    {
+      "url": "/api",
+      "description": "Behind nginx, in every environment"
+    }
+  ],
+  "paths": {
+    "/guides": {
+      "post": {
+        "tags": [
+          "guides"
+        ],
+        "summary": "Create Guide",
+        "description": "Create a guide from the parts the person marked while recording.\n\nThe steps arrive without text: Gemini writes it afterwards and a person reviews it. Nothing is\npublished here.",
+        "operationId": "create_guide_guides_post",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GuideCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GuideOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "guides"
+        ],
+        "summary": "List Guides",
+        "description": "One page of guides for the review panel, most recent first.",
+        "operationId": "list_guides_guides_get",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 20,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/GuideSummary"
+                  },
+                  "title": "Response List Guides Guides Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/guides/{guide_id}": {
+      "get": {
+        "tags": [
+          "guides"
+        ],
+        "summary": "Read Guide",
+        "description": "Read any guide, drafts included. For the review panel, not for visitors.",
+        "operationId": "read_guide_guides__guide_id__get",
+        "parameters": [
+          {
+            "name": "guide_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Guide Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GuideOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/guides/{guide_id}/steps/{step_id}": {
+      "patch": {
+        "tags": [
+          "guides"
+        ],
+        "summary": "Update Step",
+        "description": "Apply the venue's corrections to one step.",
+        "operationId": "update_step_guides__guide_id__steps__step_id__patch",
+        "parameters": [
+          {
+            "name": "guide_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Guide Id"
+            }
+          },
+          {
+            "name": "step_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Step Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StepPatch"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GuideOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/guides/{guide_id}/publish": {
+      "post": {
+        "tags": [
+          "guides"
+        ],
+        "summary": "Publish Guide",
+        "description": "Approve a reviewed guide and open its public link.",
+        "operationId": "publish_guide_guides__guide_id__publish_post",
+        "parameters": [
+          {
+            "name": "guide_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Guide Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GuideOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/public/{slug}": {
+      "get": {
+        "tags": [
+          "guides"
+        ],
+        "summary": "Read Public Guide",
+        "description": "The guide a visitor opens from the link or the QR code. Published guides only.",
+        "operationId": "read_public_guide_public__slug__get",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Slug"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GuideOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/guides/{guide_id}/video": {
+      "post": {
+        "tags": [
+          "guides"
+        ],
+        "summary": "Upload Video",
+        "description": "Receive the recording, blur the faces and store only the processed media.\n\nThe original never reaches storage and is deleted from this server either way: it shows the\nfaces of patients and staff who did not agree to be filmed. Answers 503 while the blurring is\nnot implemented, rather than storing a recording nobody has cleaned.",
+        "operationId": "upload_video_guides__guide_id__video_post",
+        "parameters": [
+          {
+            "name": "guide_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Guide Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_upload_video_guides__guide_id__video_post"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GuideOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/health": {
+      "get": {
+        "tags": [
+          "health"
+        ],
+        "summary": "Liveness check",
+        "description": "Answer as soon as the process is up. Does not touch the database.",
+        "operationId": "health_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/health/db": {
+      "get": {
+        "tags": [
+          "health"
+        ],
+        "summary": "Database connectivity check",
+        "description": "Check the database answers. Returns 503 when it is unreachable or not configured.",
+        "operationId": "health_db_health_db_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Body_upload_video_guides__guide_id__video_post": {
+        "properties": {
+          "video": {
+            "type": "string",
+            "format": "binary",
+            "title": "Video",
+            "description": "The recording, as taken by the phone."
+          }
+        },
+        "type": "object",
+        "required": [
+          "video"
+        ],
+        "title": "Body_upload_video_guides__guide_id__video_post"
+      },
+      "GuideCreate": {
+        "properties": {
+          "title": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Title",
+            "description": "Name of this guide: 'Recorrido principal', 'Sala de rayos X'."
+          },
+          "venue_name": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Venue Name"
+          },
+          "video_duration_seconds": {
+            "type": "number",
+            "exclusiveMinimum": 0.0,
+            "title": "Video Duration Seconds"
+          },
+          "marks": {
+            "items": {
+              "$ref": "#/components/schemas/MarkIn"
+            },
+            "type": "array",
+            "maxItems": 12,
+            "minItems": 2,
+            "title": "Marks",
+            "description": "One per part reached, in order. Must move forward in time and all fall before video_duration_seconds. Each mark becomes a step running to the next."
+          },
+          "language": {
+            "type": "string",
+            "maxLength": 10,
+            "title": "Language",
+            "default": "es"
+          }
+        },
+        "type": "object",
+        "required": [
+          "title",
+          "venue_name",
+          "video_duration_seconds",
+          "marks"
+        ],
+        "title": "GuideCreate"
+      },
+      "GuideOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "venue_name": {
+            "type": "string",
+            "title": "Venue Name"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status",
+            "description": "draft | needs_review | published. Only a human moves it to published."
+          },
+          "language": {
+            "type": "string",
+            "title": "Language"
+          },
+          "public_slug": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Public Slug",
+            "description": "Segment of the public URL. Null until the guide is published."
+          },
+          "qr_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Qr Url"
+          },
+          "reviewed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reviewed At",
+            "description": "Last human review. The public guide always shows this date."
+          },
+          "video_duration_seconds": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Video Duration Seconds",
+            "description": "Length of the recording."
+          },
+          "walking_minutes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Walking Minutes",
+            "description": "How long the whole route takes on foot."
+          },
+          "cover_photo_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Photo Url"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          },
+          "steps": {
+            "items": {
+              "$ref": "#/components/schemas/StepOut"
+            },
+            "type": "array",
+            "title": "Steps"
+          },
+          "pending": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Pending"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Review panel only. The public guide leaves it out."
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "venue_name",
+          "status",
+          "language",
+          "public_slug",
+          "qr_url",
+          "reviewed_at",
+          "video_duration_seconds",
+          "walking_minutes",
+          "cover_photo_url",
+          "created_at",
+          "updated_at",
+          "steps"
+        ],
+        "title": "GuideOut"
+      },
+      "GuideSummary": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "venue_name": {
+            "type": "string",
+            "title": "Venue Name"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status",
+            "description": "draft | needs_review | published. Only a human moves it to published."
+          },
+          "language": {
+            "type": "string",
+            "title": "Language"
+          },
+          "public_slug": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Public Slug",
+            "description": "Segment of the public URL. Null until the guide is published."
+          },
+          "qr_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Qr Url"
+          },
+          "reviewed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reviewed At",
+            "description": "Last human review. The public guide always shows this date."
+          },
+          "video_duration_seconds": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Video Duration Seconds",
+            "description": "Length of the recording."
+          },
+          "walking_minutes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Walking Minutes",
+            "description": "How long the whole route takes on foot."
+          },
+          "cover_photo_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Photo Url"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "venue_name",
+          "status",
+          "language",
+          "public_slug",
+          "qr_url",
+          "reviewed_at",
+          "video_duration_seconds",
+          "walking_minutes",
+          "cover_photo_url",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "GuideSummary",
+        "description": "What a list endpoint returns: no steps, so a listing stays small."
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "MarkIn": {
+        "properties": {
+          "title": {
+            "type": "string",
+            "maxLength": 60,
+            "minLength": 1,
+            "title": "Title",
+            "description": "The name the person gave this part, e.g. 'Recepcion'."
+          },
+          "category": {
+            "type": "string",
+            "enum": [
+              "entrance",
+              "reception",
+              "waiting",
+              "corridor",
+              "appointment",
+              "restroom",
+              "exit",
+              "other"
+            ],
+            "title": "Category",
+            "description": "Drives the visitor filters and the pictogram."
+          },
+          "marked_at_seconds": {
+            "type": "number",
+            "minimum": 0.0,
+            "title": "Marked At Seconds",
+            "description": "Second of the video when 'Llegue a: X' was tapped."
+          }
+        },
+        "type": "object",
+        "required": [
+          "title",
+          "category",
+          "marked_at_seconds"
+        ],
+        "title": "MarkIn",
+        "description": "One part of the route, marked by the person while recording (\"Llegue a: Recepcion\")."
+      },
+      "Pending": {
+        "properties": {
+          "steps_total": {
+            "type": "integer",
+            "title": "Steps Total"
+          },
+          "steps_reviewed": {
+            "type": "integer",
+            "title": "Steps Reviewed"
+          },
+          "missing_data": {
+            "type": "integer",
+            "title": "Missing Data"
+          }
+        },
+        "type": "object",
+        "required": [
+          "steps_total",
+          "steps_reviewed",
+          "missing_data"
+        ],
+        "title": "Pending",
+        "description": "Drives \"3 de 5 pasos revisados\" and \"2 datos por completar\" in the panel."
+      },
+      "StepOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "order": {
+            "type": "integer",
+            "title": "Order",
+            "description": "1-based position. Stored as `position`: ORDER is reserved in SQL."
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "start_seconds": {
+            "type": "number",
+            "title": "Start Seconds",
+            "description": "The mark. Adjustable from the review panel."
+          },
+          "end_seconds": {
+            "type": "number",
+            "title": "End Seconds",
+            "description": "The next mark, or the end of the video."
+          },
+          "photo_second": {
+            "type": "number",
+            "title": "Photo Second",
+            "description": "Middle of the 3 second pause taken on arrival."
+          },
+          "easy_read_text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Easy Read Text",
+            "description": "Written by Gemini from the clip, then reviewed. Null until it exists: nothing is invented."
+          },
+          "what_to_expect": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "What To Expect",
+            "description": "Short warnings, e.g. 'Suena un pitido cuando llaman'."
+          },
+          "who_to_ask_for_help": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Who To Ask For Help",
+            "description": "Null when the video does not show it, so the venue fills it in."
+          },
+          "duration_text": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration Text",
+            "description": "How long this part takes, in easy-read words: 'Unos 10 minutos'."
+          },
+          "category": {
+            "type": "string",
+            "title": "Category"
+          },
+          "interests": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Interests",
+            "description": "Which of the visitor's \"Que quieres ver antes?\" filters this step answers."
+          },
+          "missing_fields": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Missing Fields",
+            "description": "Blanks the venue must still fill in. Publishing is refused while any step has one."
+          },
+          "reviewed": {
+            "type": "boolean",
+            "title": "Reviewed",
+            "description": "Whether a person already checked this step."
+          },
+          "clip_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Clip Url",
+            "description": "Trimmed, stabilised, face-blurred clip. No audio track."
+          },
+          "photo_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Photo Url",
+            "description": "Face-blurred still frame of this part."
+          },
+          "sound_available": {
+            "type": "boolean",
+            "title": "Sound Available",
+            "description": "Whether the low-pass filtered ambience exists. It never plays on its own."
+          },
+          "noise_level": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Noise Level",
+            "description": "Relative to the rest of the video, never decibels: the phone mic is not calibrated. Null until measured."
+          },
+          "noise_level_source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Noise Level Source",
+            "description": "'measured' by the pipeline, or 'manual' when the venue corrected it."
+          },
+          "pictogram_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pictogram Url",
+            "description": "ARASAAC pictogram (CC BY-NC-SA)."
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "order",
+          "title",
+          "start_seconds",
+          "end_seconds",
+          "photo_second",
+          "easy_read_text",
+          "what_to_expect",
+          "who_to_ask_for_help",
+          "duration_text",
+          "category",
+          "interests",
+          "missing_fields",
+          "reviewed",
+          "clip_url",
+          "photo_url",
+          "sound_available",
+          "noise_level",
+          "noise_level_source",
+          "pictogram_url"
+        ],
+        "title": "StepOut"
+      },
+      "StepPatch": {
+        "properties": {
+          "title": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 60,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "start_seconds": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start Seconds"
+          },
+          "end_seconds": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End Seconds"
+          },
+          "photo_second": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Photo Second"
+          },
+          "easy_read_text": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 300
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Easy Read Text"
+          },
+          "what_to_expect": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "What To Expect"
+          },
+          "who_to_ask_for_help": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Who To Ask For Help"
+          },
+          "duration_text": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 80
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration Text"
+          },
+          "interests": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "where_to_wait",
+                    "noisy_areas",
+                    "restrooms",
+                    "who_to_ask",
+                    "exit"
+                  ]
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Interests"
+          },
+          "noise_level": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "quiet",
+                  "medium",
+                  "noisy"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Noise Level"
+          },
+          "missing_fields": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Missing Fields"
+          },
+          "reviewed": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reviewed"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "StepPatch",
+        "description": "The review panel's edits. Only the fields sent are changed."
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      }
+    }
+  }
+}

@@ -10,7 +10,8 @@ spec:
   template:
     metadata:
       annotations:
-        # Renders every key of the Vault secret (DATABASE_URL, ...) to /vault/secrets/.env,
+        # Renders every key of the Vault secret (DATABASE_URL pointing at Supabase, ...) to
+        # /vault/secrets/.env,
         # sourced by docker/backend/entrypoint.sh before migrations and uvicorn.
         vault.hashicorp.com/agent-inject: "true"
         vault.hashicorp.com/role: "talent-land-hackathon-staging"
@@ -27,7 +28,7 @@ spec:
     spec:
       containers:
         - name: talent-land-hackathon-api
-          image: ghcr.io/alenia-consulting/talent-land-hackathon-api:0.0.2
+          image: ghcr.io/alenia-consulting/talent-land-hackathon-api:0.0.8
           ports:
             - containerPort: 8000
           readinessProbe:
@@ -36,11 +37,16 @@ spec:
             initialDelaySeconds: 5
             periodSeconds: 10
           resources:
+            # Blurring faces runs the detector on every 2nd frame at 640 px. Measured in this image
+            # with 2 CPUs on a 2 minute 1280x720 recording: about 30 s, against the 300 s the ingress
+            # waits (a portrait phone recording costs more, around 2-3x). Memory peaked around 150 MB.
+            # One recording is processed at a time (a lock in media/pipeline.py), so a second upload
+            # waits for the first.
             requests:
-              cpu: "100m"
-              memory: "128Mi"
+              cpu: "1000m"
+              memory: "512Mi"
             limits:
-              cpu: "300m"
-              memory: "256Mi"
+              cpu: "2000m"
+              memory: "1Gi"
       imagePullSecrets:
         - name: github-registry-alenia-secret

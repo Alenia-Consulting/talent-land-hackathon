@@ -4,6 +4,13 @@ metadata:
   name: talent-land-hackathon
   annotations:
     cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    # ingress-nginx also defaults to 1 MB and sits in front of the container nginx. Recordings are
+    # up to 50 MB (the Supabase Storage limit).
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+    # POST /api/guides/{id}/video answers only after the faces are blurred, which takes a while.
+    # ingress-nginx cuts at 60 s by default; the container nginx already waits 300 s.
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "300"
 spec:
   ingressClassName: nginx
   tls:

@@ -1,16 +1,28 @@
-node_modules/
-dist/
-.vite/
-*.log
+# Environment files (secrets): only the templates are tracked
 .env
 .env.*
 !.env.example
-.DS_Store
-Thumbs.db
-.vscode/*
-!.vscode/extensions.json
-.idea/
-.claude/settings.local.json
-.claude/worktrees/
-*.mp4
-*.mov
+
+node_modules/
+dist/
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+.pem
+
+# Python tooling
+.venv/
+.pytest_cache/
+.coverage
+
+# Next.js
+.next/
+out/
+next-env.d.ts
+*.tsbuildinfo
+
+# Next.js dev HTTPS certificates (next dev --experimental-https)
+client/certificates/
