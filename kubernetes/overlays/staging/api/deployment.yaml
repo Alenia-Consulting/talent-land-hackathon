@@ -37,11 +37,13 @@ spec:
             initialDelaySeconds: 5
             periodSeconds: 10
           resources:
+            # Blurring faces decodes and encodes video: one recording at a time (a lock in
+            # media/pipeline.py) keeps one core busy and needs the OpenCV model in memory.
             requests:
-              cpu: "100m"
-              memory: "128Mi"
+              cpu: "500m"
+              memory: "512Mi"
             limits:
-              cpu: "300m"
-              memory: "256Mi"
+              cpu: "1500m"
+              memory: "1Gi"
       imagePullSecrets:
         - name: github-registry-alenia-secret
