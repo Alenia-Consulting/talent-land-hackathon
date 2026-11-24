@@ -5,7 +5,11 @@ import type { CameraErrorKind } from "../pure/cameraError.ts";
 const plural = (n: number, one: string, many: string): string => `${n} ${n === 1 ? one : many}`;
 
 export const es = {
-  home: { record: "Grabar un recorrido" },
+  home: {
+    record: "Grabar un recorrido",
+    tagline: "Que ninguna visita sea la primera.",
+    recordLead: "2 minutos con el móvil. Te guiamos.",
+  },
   intro: {
     title: "Graba el recorrido",
     lead: "Vas a grabar un vídeo corto (máximo 2 minutos) del camino que seguirá una persona: entrada, recepción, espera, consulta y salida.",
@@ -92,7 +96,8 @@ export const es = {
     hint: "Quédate quieto 3 segundos al llegar.",
   },
   panel: {
-    title: "Guías",
+    title: "Tus guías",
+    lead: "Todas las guías de tus centros. Revisa las que avisan de cambios.",
     empty: "Todavía no hay ninguna guía. Graba un recorrido para empezar.",
     loading: "Cargando…",
     venue: "Centro",
@@ -119,6 +124,7 @@ export const es = {
       noise: { quiet: "Tranquilo", medium: "Normal", noisy: "Ruidoso", unset: "Sin medir" },
       noiseManual: "corregido a mano",
       save: "Guardar",
+      saveAndReview: "Guardar y revisar",
       saving: "Guardando…",
       seconds: (from: number, to: number) => `Del segundo ${from} al ${to}`,
     },
