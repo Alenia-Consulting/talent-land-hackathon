@@ -96,3 +96,18 @@ def test_boxes_that_only_touch_through_a_third_are_still_merged():
     merged = faces.merge_overlapping([(0, 0, 20, 20), (40, 0, 60, 20), (15, 0, 45, 20)])
 
     assert merged == [(0, 0, 60, 20)]
+
+
+def test_the_detector_sees_the_frame_at_full_size():
+    """Downscaling the frame before detecting loses the small faces of people further away: on a
+    phone recording, 640 px of width left 14% of them uncovered. Frames are at most 720p."""
+    seen = []
+
+    def spy(image, threshold):
+        seen.append(image.shape[:2])
+        return np.empty((0, 5), np.float32), np.empty((0, 10), np.float32)
+
+    for height, width in ((1280, 720), (720, 1280)):
+        faces.find_faces(np.zeros((height, width, 3), np.uint8), spy)
+
+    assert seen == [(1280, 720), (720, 1280)]
