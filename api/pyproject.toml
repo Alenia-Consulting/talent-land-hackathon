@@ -16,4 +16,4 @@ pythonpath = ["."]
 testpaths = ["test"]
 
 [tool.coverage.run]
-omit = ["migrations/*", "test/*"]
+omit = ["migrations/*", "test/*", "scripts/*"]

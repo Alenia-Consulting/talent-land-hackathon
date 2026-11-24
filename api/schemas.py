@@ -1,0 +1,141 @@
+"""Request and response models.
+
+FastAPI builds contracts/openapi.json from these classes, and client/lib/api-types.ts is
+generated from that file; contracts/README.md explains the chain. The only difference with the
+database is the step index: the contract calls it `order`, the column is `position`, because
+ORDER is a reserved SQL word.
+"""
+
+import uuid
+from datetime import datetime
+from typing import Literal
+
+from pydantic import BaseModel, ConfigDict, Field
+
+from db.models import NOISE_LEVELS, STEP_CATEGORIES, STEP_INTERESTS
+
+Category = Literal[STEP_CATEGORIES]
+NoiseLevel = Literal[NOISE_LEVELS]
+Interest = Literal[STEP_INTERESTS]
+
+
+class MarkIn(BaseModel):
+    """One part of the route, marked by the person while recording ("Llegue a: Recepcion")."""
+
+    title: str = Field(min_length=1, max_length=60,
+                       description="The name the person gave this part, e.g. 'Recepcion'.")
+    category: Category = Field(description="Drives the visitor filters and the pictogram.")
+    marked_at_seconds: float = Field(ge=0,
+                                     description="Second of the video when 'Llegue a: X' was tapped.")
+
+
+class GuideCreate(BaseModel):
+    title: str = Field(min_length=1, max_length=120,
+                       description="Name of this guide: 'Recorrido principal', 'Sala de rayos X'.")
+    venue_name: str = Field(min_length=1, max_length=200)
+    video_duration_seconds: float = Field(gt=0)
+    marks: list[MarkIn] = Field(
+        min_length=2, max_length=12,
+        description="One per part reached, in order. Must move forward in time and all fall "
+                    "before video_duration_seconds. Each mark becomes a step running to the next.",
+    )
+    language: str = Field(default="es", max_length=10)
+
+
+class StepPatch(BaseModel):
+    """The review panel's edits. Only the fields sent are changed."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    title: str | None = Field(default=None, min_length=1, max_length=60)
+    start_seconds: float | None = Field(default=None, ge=0)
+    end_seconds: float | None = Field(default=None, ge=0)
+    photo_second: float | None = Field(default=None, ge=0)
+    easy_read_text: str | None = Field(default=None, max_length=300)
+    what_to_expect: list[str] | None = None
+    who_to_ask_for_help: str | None = None
+    duration_text: str | None = Field(default=None, max_length=80)
+    interests: list[Interest] | None = None
+    noise_level: NoiseLevel | None = None
+    missing_fields: list[str] | None = None
+    reviewed: bool | None = None
+
+
+class StepOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    order: int = Field(validation_alias="position",
+                       description="1-based position. Stored as `position`: ORDER is reserved in SQL.")
+    title: str
+    start_seconds: float = Field(description="The mark. Adjustable from the review panel.")
+    end_seconds: float = Field(description="The next mark, or the end of the video.")
+    photo_second: float = Field(description="Middle of the 3 second pause taken on arrival.")
+    easy_read_text: str | None = Field(
+        description="Written by Gemini from the clip, then reviewed. Null until it exists: "
+                    "nothing is invented.",
+    )
+    what_to_expect: list[str] = Field(
+        description="Short warnings, e.g. 'Suena un pitido cuando llaman'.")
+    who_to_ask_for_help: str | None = Field(
+        description="Null when the video does not show it, so the venue fills it in.")
+    duration_text: str | None = Field(
+        description="How long this part takes, in easy-read words: 'Unos 10 minutos'.")
+    category: str
+    interests: list[str] = Field(
+        description="Which of the visitor's \"Que quieres ver antes?\" filters this step answers.")
+    missing_fields: list[str] = Field(
+        description="Blanks the venue must still fill in. Publishing is refused while any "
+                    "step has one.",
+    )
+    reviewed: bool = Field(description="Whether a person already checked this step.")
+    clip_url: str | None = Field(description="Trimmed, stabilised, face-blurred clip. No audio track.")
+    photo_url: str | None = Field(description="Face-blurred still frame of this part.")
+    sound_available: bool = Field(
+        description="Whether the low-pass filtered ambience exists. It never plays on its own.")
+    noise_level: str | None = Field(
+        description="Relative to the rest of the video, never decibels: the phone mic is not "
+                    "calibrated. Null until measured.",
+    )
+    noise_level_source: str | None = Field(
+        description="'measured' by the pipeline, or 'manual' when the venue corrected it.")
+    pictogram_url: str | None = Field(description="ARASAAC pictogram (CC BY-NC-SA).")
+
+
+class Pending(BaseModel):
+    """Drives "3 de 5 pasos revisados" and "2 datos por completar" in the panel."""
+
+    steps_total: int
+    steps_reviewed: int
+    missing_data: int
+
+
+class GuideSummary(BaseModel):
+    """What a list endpoint returns: no steps, so a listing stays small."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    title: str
+    venue_name: str
+    status: str = Field(
+        description="draft | needs_review | published. Only a human moves it to published.")
+    language: str
+    public_slug: str | None = Field(
+        description="Segment of the public URL. Null until the guide is published.")
+    qr_url: str | None
+    reviewed_at: datetime | None = Field(
+        description="Last human review. The public guide always shows this date.")
+    video_duration_seconds: float | None = Field(description="Length of the recording.")
+    walking_minutes: int | None = Field(description="How long the whole route takes on foot.")
+    cover_photo_url: str | None
+    created_at: datetime
+    updated_at: datetime
+
+
+class GuideOut(GuideSummary):
+    steps: list[StepOut]
+    pending: Pending | None = Field(
+        default=None,
+        description="Review panel only. The public guide leaves it out.",
+    )
