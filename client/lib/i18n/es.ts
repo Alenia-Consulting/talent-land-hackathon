@@ -243,6 +243,17 @@ export const es = {
       previous: "Anterior",
       next: "Siguiente",
       finish: "Terminar",
+      // La pausa al acabar el clip. El invariante 5 — nada avanza solo — hecho pantalla: el
+      // vídeo para, dice qué viene después y espera. Lo que viene se anuncia antes de verlo,
+      // que es justo para lo que sirve esta guía.
+      paused: "En pausa",
+      stepDone: (n: number, parte: string) => `Paso ${n} terminado · ${parte}`,
+      pauseTitle: "Cuando quieras, seguimos.",
+      pauseLead: (siguiente: string) => `Lo siguiente es ${siguiente}. No pasa nada hasta que pulses.`,
+      pauseLast: "Era el último paso. No pasa nada hasta que pulses.",
+      upNext: (n: number) => `Siguiente · paso ${n}`,
+      goOn: "Seguir",
+      repeat: (parte: string) => `Repetir ${parte}`,
       doneTitle: "Ya conoces el sitio.",
       doneLead: "Puedes volver a verlo las veces que quieras, antes de ir.",
       restart: "Verlo otra vez",
