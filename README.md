@@ -12,6 +12,7 @@ See: [Agents Guidelines](../AGENTS.md).
 # If Docker and Docker compose install it.
 
 cp api/.env.example api/.env   # PowerShell: Copy-Item api/.env.example api/.env
+# then set DATABASE_URL to the Supabase Session pooler URI (see api/.env.example)
 
 docker compose up --build
 
@@ -24,12 +25,20 @@ docker compose up --build
 
 ## Database
 
-PostgreSQL, accessed through SQLAlchemy 2.x with Alembic migrations (see the
-[Database guidelines](AGENTS.md#database-guidelines)).
+PostgreSQL hosted on Supabase, accessed through SQLAlchemy 2.x with Alembic migrations (see the
+[Database guidelines](AGENTS.md#database-guidelines)). Supabase is only the host: the schema changes
+through migrations, never from the Supabase dashboard.
+
+- `DATABASE_URL` is the Supabase **Session pooler** URI (port 5432, user `postgres.<project-ref>`,
+  `sslmode=require`). Not the direct host (IPv6 only) and not the transaction pooler (breaks the
+  migration advisory lock and prepared statements). Local: `api/.env`. Staging: Vault.
+- Every table has row level security enabled with no policy (migration `enable_row_level_security`):
+  Supabase exposes the public schema through its Data API, and this denies the publishable key. The
+  API connects as the database owner, which bypasses RLS. Enable it on every new table too.
 
 - Models: `api/db/models.py`. Sessions: `api/db/session.py` (`get_session` FastAPI dependency)
 - Migrations: `api/migrations/versions/`, applied automatically when the API container starts
-- New migration, from `api/` with the database running and `DATABASE_URL` pointing at `localhost`:
+- New migration, from `api/` with `DATABASE_URL` set:
 
 ```bash
 alembic revision --autogenerate -m "add_invoice_due_date"   # then review the generated file
