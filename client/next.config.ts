@@ -9,6 +9,8 @@ const nextConfig: NextConfig = {
 // Ignored by `npm run build`.
 if (process.env.NODE_ENV === "development") {
   const target = process.env.API_PROXY_TARGET || "http://localhost:8000";
+  // Let the iPhone load dev assets through a tunnel (see README).
+  nextConfig.allowedDevOrigins = ["*.trycloudflare.com", "*.ngrok-free.app", "*.ngrok-free.dev", "*.ts.net", "*.*.ts.net"];
   nextConfig.rewrites = async () => [
     { source: "/api/:path*", destination: `${target}/api/:path*`  },
   ];
