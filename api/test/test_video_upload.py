@@ -139,6 +139,7 @@ def test_the_processed_media_reaches_storage_and_the_steps(
 
     monkeypatch.setattr("routers.guides.UPLOAD_DIR", tmp_path)
     monkeypatch.setenv("SUPABASE_URL", "https://p.supabase.co")
+    monkeypatch.delenv("SUPABASE_BUCKET", raising=False)  # api/.env may name another bucket
     monkeypatch.setattr(
         "media.pipeline.process",
         lambda video, steps: [
