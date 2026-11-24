@@ -143,15 +143,8 @@ export default function GrabarPage() {
   };
 
   const send = async () => {
-    if (!plan || !recorder.result) return;
-
-    // Checked here as well as in the API: a 422 after the fact would cost the recording.
-    const problem = whyNotSendable(marks, recorder.result.durationSec);
-    if (problem) {
-      setError({ source: "upload", message: problem });
-      setPhase("error");
-      return;
-    }
+    // markProblem already keeps the button disabled; this is the guard, not the message.
+    if (!plan || !recorder.result || markProblem) return;
 
     setPhase("enviando");
     try {
@@ -169,6 +162,10 @@ export default function GrabarPage() {
       setPhase("error");
     }
   };
+
+  // Known before sending, so it is shown on the review screen with "Enviar" disabled instead of
+  // throwing the person onto a screen titled "Algo ha fallado" for something they can redo.
+  const markProblem = recorder.result ? whyNotSendable(marks, recorder.result.durationSec) : null;
 
   const reviewNotice =
     recorder.result?.stopReason === "background"
@@ -189,7 +186,12 @@ export default function GrabarPage() {
     ),
     permisos: <PermissionScreen starting={camera.status === "starting"} resumed={resumed} />,
     revision: recorder.result && (
-      <ReviewScreen url={recorder.result.url} alerts={alertLog.alerts} notice={reviewNotice} />
+      <ReviewScreen
+        url={recorder.result.url}
+        alerts={alertLog.alerts}
+        notice={reviewNotice}
+        problem={markProblem}
+      />
     ),
     enviando: <Message title={es.enviando.title} />,
     hecho: <DoneScreen />,
@@ -220,7 +222,9 @@ export default function GrabarPage() {
         <ActionButton variant="secondary" onClick={retry}>
           {es.revision.retry}
         </ActionButton>
-        <ActionButton onClick={send}>{es.revision.send}</ActionButton>
+        <ActionButton onClick={send} disabled={markProblem !== null}>
+          {es.revision.send}
+        </ActionButton>
       </>
     ),
     enviando: null,
@@ -253,19 +257,19 @@ export default function GrabarPage() {
   }[phase];
 
   return (
-    <section className="fixed inset-0 flex flex-col bg-black text-white">
+    <section className="fixed inset-0 flex flex-col bg-tinta text-niebla">
       {phase === "listo" || phase === "grabando" ? (
         <div className="relative min-h-0 flex-1 overflow-hidden">
           <CameraPreview stream={camera.stream} videoRef={camera.videoRef} />
           {phase === "grabando" && <RecordingClock remainingSec={recorder.remainingSec} />}
           <WarningStack active={{ luz: light.active, movimiento: motion.active }} />
           {phase === "listo" && (
-            <p className="absolute inset-x-4 bottom-4 rounded-xl bg-black/60 px-4 py-3 text-center text-lg">
+            <p className="absolute inset-x-4 bottom-4 rounded-2xl bg-tinta/80 px-4 py-3 text-center text-lg">
               {es.listo.hint}
             </p>
           )}
           {phase === "grabando" && plan && (
-            <p className="absolute inset-x-4 bottom-4 rounded-xl bg-black/60 px-4 py-3 text-center text-lg">
+            <p className="absolute inset-x-4 bottom-4 rounded-2xl bg-tinta/80 px-4 py-3 text-center text-lg">
               {pending.length === 0
                 ? es.marcar.done
                 : `${es.marcar.progress(marks.length, plan.parts.length)} · ${es.marcar.hint}`}

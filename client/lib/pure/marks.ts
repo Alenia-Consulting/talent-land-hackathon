@@ -45,23 +45,28 @@ export function markAt(part: Part, elapsedMs: number): Mark {
  */
 export function whyNotSendable(marks: Mark[], durationSec: number): string | null {
   if (marks.length < MIN_MARKS) {
-    return `Marca al menos dos partes del recorrido. Llevas ${marks.length}.`;
+    return marks.length === 0
+      ? "No marcaste ninguna parte. Repite la grabación y pulsa «Llegué a» al llegar a cada una."
+      : "Solo marcaste una parte, y hacen falta dos. Repite la grabación y pulsa «Llegué a» en cada parte.";
   }
   if (marks.length > MAX_MARKS) {
     return `Son demasiadas partes: ${marks.length}. El máximo es ${MAX_MARKS}.`;
   }
   for (let i = 1; i < marks.length; i++) {
     if (marks[i].marked_at_seconds <= marks[i - 1].marked_at_seconds) {
-      return "Las marcas están fuera de orden: cada una debe ir después de la anterior.";
+      return "Dos marcas quedaron en el mismo segundo o fuera de orden. Repite la grabación y deja unos segundos entre una parte y la siguiente.";
     }
   }
 
   const last = marks[marks.length - 1].marked_at_seconds;
   if (last >= durationSec) {
-    return "Hay una marca posterior al final del vídeo.";
+    return "Hay una marca posterior al final del vídeo. Repite la grabación.";
   }
   if (last + PAUSE_MS / 1000 > durationSec) {
-    return "La última marca está demasiado pegada al final del vídeo: ese paso se quedaría sin imagen.";
+    return (
+      "Marcaste la última parte justo antes de parar, y ese paso se quedaría sin foto. " +
+      "Repite la grabación y, después de marcar la última parte, sigue grabando 3 segundos antes de pulsar «Parar»."
+    );
   }
   return null;
 }

@@ -39,6 +39,7 @@ export const es = {
   },
   revision: {
     title: "Revisa el vídeo",
+    cannotSend: "Todavía no se puede enviar",
     retry: "Repetir",
     send: "Enviar",
     noAlerts: "Sin avisos de calidad.",
