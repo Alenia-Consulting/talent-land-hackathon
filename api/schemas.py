@@ -1,8 +1,9 @@
 """Request and response models.
 
-These follow contracts/guide.schema.json, the contract shared with the player. The only difference
-with the database is the step index: the contract calls it `order`, the column is `position`,
-because ORDER is a reserved SQL word.
+FastAPI builds contracts/openapi.json from these classes, and client/lib/api-types.ts is
+generated from that file; contracts/README.md explains the chain. The only difference with the
+database is the step index: the contract calls it `order`, the column is `position`, because
+ORDER is a reserved SQL word.
 """
 
 import uuid

@@ -113,8 +113,8 @@ StringList = JSON().with_variant(JSONB, "postgresql")
 class Step(TimestampMixin, Base):
     """One stage of the route, cut from the uploaded video.
 
-    Field names follow contracts/guide.schema.json, except `position`, which the contract calls
-    `order` (a reserved SQL word).
+    Field names follow the published contract (contracts/openapi.json), except `position`,
+    which the contract calls `order` (a reserved SQL word).
     """
 
     __tablename__ = "steps"
