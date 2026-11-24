@@ -10,7 +10,7 @@ const nextConfig: NextConfig = {
 if (process.env.NODE_ENV === "development") {
   const target = process.env.API_PROXY_TARGET || "http://localhost:8000";
   nextConfig.rewrites = async () => [
-    { source: "/api/:path*", destination: `${target}/api/:path*` },
+    { source: "/api/:path*", destination: `${target}/api/:path*`  },
   ];
 }
 
