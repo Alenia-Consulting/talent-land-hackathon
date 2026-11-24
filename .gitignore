@@ -23,3 +23,6 @@ __pycache__/
 out/
 next-env.d.ts
 *.tsbuildinfo
+
+# Next.js dev HTTPS certificates (next dev --experimental-https)
+client/certificates/
