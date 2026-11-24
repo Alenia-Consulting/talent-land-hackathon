@@ -116,11 +116,14 @@ Reglas duras:
 
 ### Base de datos
 
-- Postgres propio: servicio `talent-land-hackathon-postgres` en `docker-compose`, StatefulSet en
-  `kubernetes/overlays/staging/postgres/`. Acceso con **SQLAlchemy 2.x + Alembic** y el driver
-  `psycopg[binary]`, mediante la única variable `DATABASE_URL`.
-  Para usar el Postgres de Supabase basta con cambiar `DATABASE_URL`.
-- **Supabase se usa solo para Storage** (clips, fotos, audio), nunca para el esquema.
+- Postgres alojado en **Supabase**, en local y en staging. Acceso con **SQLAlchemy 2.x + Alembic** y
+  el driver `psycopg[binary]`, mediante la única variable `DATABASE_URL`: la URI del **Session
+  pooler** (puerto 5432, `sslmode=require`), no el host directo (solo IPv6) ni el Transaction
+  pooler (rompe el advisory lock de las migraciones). Local: `api/.env`. Staging: Vault.
+- Supabase es solo el host de Postgres (y Storage para clips, fotos y audio): el esquema **no** se
+  toca desde su panel. Toda tabla nueva debe activar **RLS sin políticas** en su migración, porque
+  Supabase expone el esquema `public` por su Data API; la API conecta como propietario y no se ve
+  afectada.
 - El esquema cambia **únicamente por migraciones**: nada de `Base.metadata.create_all()`, nada de
   `ALTER TABLE` a mano, nada de editar tablas desde un panel web.
 - Una migración por cambio lógico, con nombre descriptivo (`add_guide_published_at`, no `update`).
