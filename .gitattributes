@@ -1,2 +1,6 @@
-# Windows line endings (CRLF) break the container entrypoints.
-*.sh text eol=lf
+* text=auto eol=lf
+*.pdf binary
+*.png binary
+*.jpg binary
+*.mp4 binary
+*.mov binary

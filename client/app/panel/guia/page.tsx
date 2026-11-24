@@ -18,7 +18,8 @@ import {
   type StepPatch,
 } from "../../../lib/guides.ts";
 import { es } from "../../../lib/i18n/es.ts";
-import { Button, Card, StatusChip } from "../../ui.tsx";
+import { Button, StatusChip } from "../../ui.tsx";
+import { ShareCard } from "./share.tsx";
 import { StepForm } from "./step-form.tsx";
 
 const t = es.panel.detail;
@@ -96,15 +97,7 @@ function GuideDetail() {
         </p>
       )}
 
-      {guide.status === "published" && guide.public_slug && (
-        <Card className="mt-4 bg-salvia">
-          <p className="font-bold">{t.published}</p>
-          <Link href={`/g?slug=${guide.public_slug}`} className="text-lg font-bold text-pino underline">
-            /g?slug={guide.public_slug}
-          </Link>
-        </Card>
-      )}
-
+      {guide.status === "published" && guide.public_slug && <ShareCard slug={guide.public_slug} />}
       <ol className="mt-6 grid gap-4">
         {guide.steps.map((step) => (
           <StepForm
