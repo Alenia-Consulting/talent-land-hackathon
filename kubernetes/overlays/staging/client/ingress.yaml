@@ -8,10 +8,10 @@ spec:
   ingressClassName: nginx
   tls:
     - hosts:
-        - talent-land-hackathon.staging.alenia.io
+        - antesala.staging.alenia.io
       secretName: talent-land-hackathon-tls
   rules:
-    - host: talent-land-hackathon.staging.alenia.io
+    - host: antesala.staging.alenia.io
       http:
         paths:
           - path: /
