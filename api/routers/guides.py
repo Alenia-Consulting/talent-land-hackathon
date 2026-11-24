@@ -5,14 +5,17 @@ Mounted under root_path="/api", so these routes are served as /api/guides and /a
 Routes never touch the ORM: every read and write goes through db.guides.
 """
 
+import pathlib
+import tempfile
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from sqlalchemy.orm import Session
 
 from db import guides
 from db.models import Guide
 from db.session import get_session
+from media import pipeline, storage
 from schemas import GuideCreate, GuideOut, GuideSummary, Pending, StepPatch
 
 router = APIRouter(tags=["guides"])
@@ -20,6 +23,29 @@ router = APIRouter(tags=["guides"])
 # Same text whether the guide does not exist or is still a draft: a visitor who guesses a slug
 # learns nothing about work in progress.
 NOT_FOUND = "guide not found"
+
+# Two minutes at 2.5 Mbps is roughly 37 MB; this leaves room without letting anyone fill the disk.
+MAX_VIDEO_BYTES = 100 * 1024 * 1024
+UPLOAD_DIR = pathlib.Path(tempfile.gettempdir()) / "antesala-uploads"
+CHUNK_BYTES = 1024 * 1024
+
+
+def _save_upload(video: UploadFile, target: pathlib.Path) -> None:
+    """Stream the upload to disk, refusing it as soon as it goes over the limit.
+
+    Read in chunks rather than all at once: a single large upload should not be able to exhaust
+    the memory of the Pod.
+    """
+    written = 0
+    with target.open("wb") as handle:
+        while chunk := video.file.read(CHUNK_BYTES):
+            written += len(chunk)
+            if written > MAX_VIDEO_BYTES:
+                raise HTTPException(
+                    status_code=413,
+                    detail=f"el vídeo supera el límite de {MAX_VIDEO_BYTES // (1024 * 1024)} MB",
+                )
+            handle.write(chunk)
 
 
 def _with_pending(guide: Guide) -> GuideOut:
@@ -109,3 +135,63 @@ def read_public_guide(slug: str, session: Session = Depends(get_session)) -> Gui
     if guide is None:
         raise HTTPException(status_code=404, detail=NOT_FOUND)
     return GuideOut.model_validate(guide)
+
+
+@router.post("/guides/{guide_id}/video", response_model=GuideOut)
+def upload_video(
+    guide_id: uuid.UUID,
+    video: UploadFile = File(description="The recording, as taken by the phone."),
+    session: Session = Depends(get_session),
+) -> GuideOut:
+    """Receive the recording, blur the faces and store only the processed media.
+
+    The original never reaches storage and is deleted from this server either way: it shows the
+    faces of patients and staff who did not agree to be filmed. Answers 503 while the blurring is
+    not implemented, rather than storing a recording nobody has cleaned.
+    """
+    guide = _load(session, guide_id)
+
+    if not (video.content_type or "").startswith("video/"):
+        raise HTTPException(status_code=415, detail="el fichero debe ser un vídeo")
+
+    UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+    target = UPLOAD_DIR / f"{guide_id}-{uuid.uuid4().hex}"
+    try:
+        _save_upload(video, target)
+
+        timings = [
+            pipeline.StepTiming(
+                position=step.position,
+                start_seconds=step.start_seconds,
+                end_seconds=step.end_seconds,
+                photo_second=step.photo_second,
+            )
+            for step in guide.steps
+        ]
+        processed = pipeline.process(target, timings)
+
+        config = storage.config_from_env()
+        by_position = {step.position: step for step in guide.steps}
+        for item in processed:
+            step = by_position.get(item.position)
+            if step is None:
+                continue
+            base = f"{guide.public_slug or guide.id}/paso-{item.position}"
+            step.clip_url = storage.upload(config, f"{base}.mp4", item.clip, "video/mp4")
+            step.photo_url = storage.upload(config, f"{base}.jpg", item.photo, "image/jpeg")
+            if item.sound is not None:
+                storage.upload(config, f"{base}.mp3", item.sound, "audio/mpeg")
+                step.sound_available = True
+            if item.noise_level is not None:
+                step.noise_level = item.noise_level
+                step.noise_level_source = "measured"
+        session.commit()
+    except pipeline.ProcessingUnavailable as error:
+        raise HTTPException(status_code=503, detail=str(error)) from error
+    except storage.StorageError as error:
+        raise HTTPException(status_code=502, detail=str(error)) from error
+    finally:
+        # The recording never stays on the server, whatever happened above.
+        target.unlink(missing_ok=True)
+
+    return _with_pending(guide)

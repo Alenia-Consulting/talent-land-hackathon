@@ -111,6 +111,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/guides/{guide_id}/video": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Upload Video
+         * @description Receive the recording, blur the faces and store only the processed media.
+         *
+         *     The original never reaches storage and is deleted from this server either way: it shows the
+         *     faces of patients and staff who did not agree to be filmed. Answers 503 while the blurring is
+         *     not implemented, rather than storing a recording nobody has cleaned.
+         */
+        post: operations["upload_video_guides__guide_id__video_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/health": {
         parameters: {
             query?: never;
@@ -155,6 +179,15 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** Body_upload_video_guides__guide_id__video_post */
+        Body_upload_video_guides__guide_id__video_post: {
+            /**
+             * Video
+             * Format: binary
+             * @description The recording, as taken by the phone.
+             */
+            video: string;
+        };
         /** GuideCreate */
         GuideCreate: {
             /**
@@ -647,6 +680,41 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GuideOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    upload_video_guides__guide_id__video_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                guide_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_upload_video_guides__guide_id__video_post"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {
