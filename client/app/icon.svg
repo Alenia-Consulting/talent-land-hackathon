@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- Antesala tab icon: pino (action colour) tile with the initial drawn as strokes, so it
+       does not depend on a font being available. -->
+  <rect width="64" height="64" rx="16" fill="#1f5d50"/>
+  <path d="M19 49 L32 15 L45 49 M24 38 H40" fill="none" stroke="#ffffff" stroke-width="7"
+        stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
