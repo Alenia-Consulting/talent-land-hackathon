@@ -8,7 +8,8 @@ import io
 import pathlib
 import uuid
 
-from media import faces, pipeline, storage
+from db import guides
+from media import faces, pipeline, storage, video_io
 from media_fixtures import make_video
 
 
@@ -279,3 +280,57 @@ def test_a_recording_already_being_processed_is_refused(client, db_session, make
     response = upload(client, guide.id)
 
     assert response.status_code == 409
+
+
+def _two_part_guide(db_session):
+    guide = guides.create(
+        db_session, title="Recorrido principal", venue_name="Centro Trinidad",
+        marks=[{"title": "Entrada", "category": "entrance", "marked_at_seconds": 0.0},
+               {"title": "Recepción", "category": "reception", "marked_at_seconds": 12.0}],
+        video_duration_seconds=30.0,
+    )
+    db_session.commit()
+    return guide
+
+
+def test_the_steps_reach_the_pipeline_on_the_timeline_of_the_file(
+    client, db_session, monkeypatch, tmp_path
+):
+    """The phone said 30 s; the file lasts 20 s. Only retiming can produce what the pipeline gets."""
+    guide = _two_part_guide(db_session)
+    monkeypatch.setattr("routers.guides.UPLOAD_DIR", tmp_path)
+    monkeypatch.setattr(video_io, "duration", lambda video: 20.0)
+    received = []
+
+    def refuse(video, timings):
+        received.extend(timings)
+        raise pipeline.ProcessingFailed("stop here")
+
+    monkeypatch.setattr("media.pipeline.process", refuse)
+
+    upload(client, guide.id)
+
+    assert [(t.start_seconds, t.end_seconds, t.photo_second) for t in received] == [
+        (0.0, 12.0, 6.0),
+        (12.0, 20.0, 16.0),  # before: (12.0, 30.0, 13.5)
+    ]
+
+
+def test_a_recording_that_cannot_be_measured_marks_the_route_failed(
+    client, db_session, monkeypatch, tmp_path
+):
+    guide = _two_part_guide(db_session)
+    monkeypatch.setattr("routers.guides.UPLOAD_DIR", tmp_path)
+
+    def unreadable(video):
+        raise video_io.ProcessingFailed("no se pudo leer el vídeo")
+
+    monkeypatch.setattr(video_io, "duration", unreadable)
+
+    response = upload(client, guide.id)
+
+    assert response.status_code == 422
+    assert response.json()["detail"] == "no se pudo leer el vídeo"
+    db_session.refresh(guide)
+    assert guide.routes[0].processing_status == "failed"
+    assert list(tmp_path.iterdir()) == []
