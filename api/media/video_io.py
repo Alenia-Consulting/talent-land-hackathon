@@ -9,6 +9,7 @@ and the sizes below are already the rotated ones.
 """
 
 import pathlib
+import re
 import subprocess
 from collections.abc import Iterator
 from contextlib import contextmanager
@@ -30,6 +31,23 @@ def ffmpeg_exe() -> str:
         return imageio_ffmpeg.get_ffmpeg_exe()
     except Exception as error:  # the wheel has no binary for this platform
         raise ProcessingUnavailable("ffmpeg no está disponible en este servidor") from error
+
+
+def duration(video: pathlib.Path) -> float:
+    """The real length of the file in seconds, found by decoding all of it.
+
+    The header cannot be trusted: a webm from MediaRecorder usually carries no duration. ffmpeg
+    reports its progress as `time=HH:MM:SS.ss`, and the last one is where the decoding ended.
+    """
+    result = subprocess.run(
+        [ffmpeg_exe(), "-i", str(video), "-f", "null", "-"],
+        capture_output=True, text=True, errors="replace",
+    )
+    times = re.findall(r"time=(\d+):(\d{2}):(\d{2}(?:\.\d+)?)", result.stderr)
+    if not times:
+        raise ProcessingFailed("no se pudo leer el vídeo")
+    hours, minutes, seconds = times[-1]
+    return int(hours) * 3600 + int(minutes) * 60 + float(seconds)
 
 
 def target_size(video: pathlib.Path) -> Size:

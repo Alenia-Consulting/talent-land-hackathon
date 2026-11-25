@@ -93,6 +93,27 @@ def add_route(
     return route
 
 
+def retime_route(route: Route, measured_seconds: float) -> None:
+    """Move the route's steps onto the real timeline of the file that was uploaded.
+
+    The phone sends the wall-clock time between Record and Stop, which is not the length of the
+    file: the encoder usually ends earlier. Each step still starts where its mark says and runs
+    until the next one; the last runs to the end of the file, and nothing goes past it.
+    """
+    steps = sorted(route.steps, key=lambda step: step.position)
+    for step, following in zip(steps, [*steps[1:], None], strict=False):
+        step.start_seconds = min(step.start_seconds, measured_seconds)
+        step.end_seconds = (
+            measured_seconds if following is None
+            else min(following.start_seconds, measured_seconds)
+        )
+        step.photo_second = (step.start_seconds + step.end_seconds) / 2
+    route.video_duration_seconds = measured_seconds
+    route.guide.video_duration_seconds = sum(
+        one.video_duration_seconds or 0.0 for one in route.guide.routes
+    )
+
+
 def route_of(guide: Guide, route_id: uuid.UUID) -> Route | None:
     return next((route for route in guide.routes if route.id == route_id), None)
 

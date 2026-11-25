@@ -72,3 +72,24 @@ def client(db_session):
     with TestClient(main.app) as test_client:
         yield test_client
     main.app.dependency_overrides.clear()
+
+
+@pytest.fixture(autouse=True)
+def measurable_upload(monkeypatch):
+    """Upload tests send placeholder bytes, which no decoder can measure.
+
+    A real video is measured for real; bytes that are not a video get a length longer than any
+    step, so the steps keep the timings the test gave them.
+    """
+    from media import video_io
+    from media.errors import ProcessingFailed
+
+    real = video_io.duration
+
+    def duration(video):
+        try:
+            return real(video)
+        except ProcessingFailed:
+            return 1000.0
+
+    monkeypatch.setattr("routers.guides.video_io", type("VideoIo", (), {"duration": staticmethod(duration)}))

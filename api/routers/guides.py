@@ -18,7 +18,7 @@ from db import guides
 from db.models import Guide, Route
 from db.session import get_session
 from ai import gemini
-from media import pipeline, storage
+from media import pipeline, storage, video_io
 from schemas import (
     GuideCreate,
     GuideOut,
@@ -314,6 +314,8 @@ def _ingest(session: Session, guide: Guide, route: Route, video: UploadFile) -> 
         _save_upload(video, target)
         _set_processing_status(session, guide, route, "processing")
 
+        # The duration the phone sent is a hint: the file says how long the recording really is.
+        guides.retime_route(route, video_io.duration(target))
         steps = route.steps
         timings = [
             pipeline.StepTiming(

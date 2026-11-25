@@ -269,3 +269,59 @@ def test_the_catalogue_is_one_page_at_a_time(db_session, make_guide):
 
     assert len(guides.list_published(db_session, limit=2)) == 2
     assert [g.venue_name for g in guides.list_published(db_session, limit=2, offset=2)] == ["Centro 2"]
+
+
+# `make_guide` builds a bare Guide, with no routes or steps: a guide with routes is built here.
+def _one_take(db_session, seconds: float):
+    return guides.create(db_session, title="Recorrido principal", venue_name="Centro Trinidad",
+                         marks=[{"title": "Entrada", "category": "entrance",
+                                 "marked_at_seconds": 0.0}],
+                         video_duration_seconds=seconds)
+
+
+def test_retiming_stretches_a_step_when_the_file_is_longer(db_session):
+    """El reloj del móvil se queda corto al llegar al tope: la cola no se pierde."""
+    route = _one_take(db_session, 120.0).routes[0]
+
+    guides.retime_route(route, 120.4)
+
+    assert route.steps[0].end_seconds == 120.4
+    assert route.video_duration_seconds == 120.4
+
+
+def test_retiming_shortens_a_step_when_the_file_is_shorter(db_session):
+    route = _one_take(db_session, 30.0).routes[0]
+
+    guides.retime_route(route, 18.5)
+
+    assert route.steps[0].end_seconds == 18.5
+
+
+def test_retiming_puts_the_photo_in_the_middle_of_the_step(db_session):
+    """Hoy sale «marca + 1,5 s»: el instante justo después de pulsar Grabar."""
+    route = _one_take(db_session, 30.0).routes[0]
+
+    guides.retime_route(route, 20.0)
+
+    assert route.steps[0].photo_second == 10.0
+
+
+def test_retiming_adds_up_the_duration_of_the_whole_guide(db_session):
+    guide = _one_take(db_session, 30.0)
+    guides.add_route(db_session, guide, title="Recepción",
+                     marks=[{"title": "Recepción", "category": "reception",
+                             "marked_at_seconds": 0.0}],
+                     video_duration_seconds=30.0)
+
+    guides.retime_route(guide.routes[0], 18.0)
+
+    assert guide.video_duration_seconds == 48.0
+
+
+def test_retiming_chains_the_steps_and_clamps_marks_past_the_end(db_session):
+    guide = create(db_session)  # marks at 0, 12 and 30
+
+    guides.retime_route(guide.routes[0], 20.0)
+
+    steps = guide.routes[0].steps
+    assert [(s.start_seconds, s.end_seconds) for s in steps] == [(0.0, 12.0), (12.0, 20.0), (20.0, 20.0)]
