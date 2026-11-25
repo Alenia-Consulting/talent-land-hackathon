@@ -98,6 +98,31 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/public/guides": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Public Guides
+         * @description The catalogue a visitor browses when nobody sent them a link or showed them a QR.
+         *
+         *     Declared BEFORE /public/{slug}: FastAPI answers with the first route that matches, and the
+         *     slug one would take this request and reply "guide not found".
+         *
+         *     A larger page than the panel's: this one is read whole, not paged through.
+         */
+        get: operations["list_public_guides_public_guides_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/public/{slug}": {
         parameters: {
             query?: never;
@@ -464,6 +489,39 @@ export interface components {
              * @description [ymin, xmin, ymax, xmax], each from 0 to 1000 of the photo's height or width. Relative, so it fits any screen size.
              */
             box_2d: number[];
+        };
+        /**
+         * PublicGuideSummary
+         * @description One line of the public catalogue: what somebody looking for a place needs to recognise it.
+         *
+         *     Deliberately narrower than GuideSummary. A visitor has nothing to do with `id`, `status` or
+         *     `processing_status`: those belong to the panel, and a catalogue that carried them would tell
+         *     anyone who asked how each venue's work is going.
+         */
+        PublicGuideSummary: {
+            /** Title */
+            title: string;
+            /** Venue Name */
+            venue_name: string;
+            /**
+             * Public Slug
+             * @description Segment of the public URL, as in /g?slug=...
+             */
+            public_slug: string;
+            /** Cover Photo Url */
+            cover_photo_url: string | null;
+            /**
+             * Walking Minutes
+             * @description How long the whole route takes on foot.
+             */
+            walking_minutes: number | null;
+            /**
+             * Reviewed At
+             * @description Last human review. The public guide always shows this date.
+             */
+            reviewed_at: string | null;
+            /** Language */
+            language: string;
         };
         /**
          * RouteCreate
@@ -853,6 +911,38 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["GuideOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_public_guides_public_guides_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PublicGuideSummary"][];
                 };
             };
             /** @description Validation Error */
