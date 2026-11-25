@@ -9,6 +9,8 @@ import { apiUrl } from "./config.ts";
 
 export type Guide = components["schemas"]["GuideOut"];
 export type GuideSummary = components["schemas"]["GuideSummary"];
+/** One line of the public catalogue. Narrower than GuideSummary: no id, no status. */
+export type PublicGuide = components["schemas"]["PublicGuideSummary"];
 export type Step = components["schemas"]["StepOut"];
 export type Mark = components["schemas"]["MarkIn"];
 export type GuideCreate = components["schemas"]["GuideCreate"];
@@ -152,6 +154,18 @@ export function publishGuide(id: string, fetchImpl?: typeof fetch): Promise<Guid
 /** GET /public/{slug} — what the visitor opens. Published guides only. */
 export function readPublicGuide(slug: string, fetchImpl?: typeof fetch): Promise<Guide> {
   return request<Guide>(`/public/${slug}`, { method: "GET" }, fetchImpl);
+}
+
+/** GET /public/guides — the catalogue somebody browses when nobody sent them a link. */
+export function listPublicGuides(
+  { limit = 50, offset = 0 }: { limit?: number; offset?: number } = {},
+  fetchImpl?: typeof fetch,
+): Promise<PublicGuide[]> {
+  return request<PublicGuide[]>(
+    `/public/guides?limit=${limit}&offset=${offset}`,
+    { method: "GET" },
+    fetchImpl,
+  );
 }
 
 /**
