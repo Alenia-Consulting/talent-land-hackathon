@@ -68,9 +68,10 @@ function readDetail(status: number, responseText: string): string {
 /**
  * POST {apiUrl}/guides/{guideId}/video as multipart/form-data; XMLHttpRequest gives upload progress.
  *
- * The API answers 503 while the face blurring in api/media/pipeline.py does not exist: a recording
- * with recognisable faces must never reach storage. The caller treats that as "guide saved, video
- * still on the device", not as a failure.
+ * The API blurs the faces, cuts a clip and a photo per step and stores only those; the recording
+ * itself never leaves the server. It still answers 503 where that processing is unavailable, and
+ * the caller treats that as "guide saved, video still on the device" rather than as a failure,
+ * because a recording with recognisable faces must never reach storage.
  */
 export function uploadVideo(
   guideId: string,

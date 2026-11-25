@@ -15,8 +15,15 @@ import { useFrameSampler } from "../../lib/useFrameSampler.ts";
 import { useLightMonitor } from "../../lib/useLightMonitor.ts";
 import { useMotionMonitor } from "../../lib/useMotionMonitor.ts";
 import { useRecorder } from "../../lib/useRecorder.ts";
-import { CameraPreview, DebugPanel, RecordingClock, WarningStack } from "./overlays.tsx";
-import { PartsScreen, type Plan } from "./parts.tsx";
+import {
+  CameraPreview,
+  CoachCard,
+  DebugPanel,
+  RecordingBar,
+  StepRail,
+  WarningStack,
+} from "./overlays.tsx";
+import { EMPTY_PLAN, PartsScreen, type Plan, planWarning } from "./parts.tsx";
 import {
   ActionButton,
   DoneScreen,
@@ -44,6 +51,8 @@ export default function GrabarPage() {
   const [debug, setDebug] = useState(false);
   const [resumed, setResumed] = useState(false);
   const [plan, setPlan] = useState<Plan | null>(null);
+  // The parts screen is a form the footer button acts on, so the page holds what it is typing.
+  const [draft, setDraft] = useState<Plan>(EMPTY_PLAN);
   const [marks, setMarks] = useState<Mark[]>([]);
   const [guideId, setGuideId] = useState<string | null>(null);
   const [videoSent, setVideoSent] = useState(false);
@@ -55,7 +64,9 @@ export default function GrabarPage() {
   const recorder = useRecorder();
   const alertLog = useAlertLog();
 
-  const preview = (phase === "listo" || phase === "grabando") && camera.status === "ready";
+  // The only two dark screens of the recorder: the ones with the camera behind them.
+  const cameraPhase = phase === "listo" || phase === "grabando";
+  const preview = cameraPhase && camera.status === "ready";
   const sample = useFrameSampler(camera.videoRef, preview);
   const onAlert = useCallback(
     (tipo: AlertType) => (event: { type: "start" | "end"; at: number }) => {
@@ -170,7 +181,8 @@ export default function GrabarPage() {
         await uploadVideo(id, input, setProgress);
         setVideoSent(true);
       } catch (cause) {
-        // 503: the API cannot process video yet. The guide is saved and the video stays on the device.
+        // 503: that deployment cannot process video. The guide is saved, the video stays on the
+        // device, and the done screen offers the download instead of claiming it was sent.
         if (!(cause instanceof VideoUploadError && cause.status === 503)) throw cause;
       }
       setPhase("hecho");
@@ -198,14 +210,7 @@ export default function GrabarPage() {
 
   const body = {
     intro: <IntroScreen />,
-    partes: (
-      <PartsScreen
-        onReady={(chosen) => {
-          setPlan(chosen);
-          setPhase("permisos");
-        }}
-      />
-    ),
+    partes: <PartsScreen plan={draft} onChange={setDraft} />,
     permisos: <PermissionScreen starting={camera.status === "starting"} resumed={resumed} />,
     revision: recorder.result && (
       <ReviewScreen
@@ -222,19 +227,35 @@ export default function GrabarPage() {
 
   const actions = {
     intro: <ActionButton onClick={() => setPhase("partes")}>{es.intro.next}</ActionButton>,
-    partes: null,
+    partes: (
+      <ActionButton
+        disabled={planWarning(draft) !== null}
+        onClick={() => {
+          setPlan({ ...draft, title: draft.title.trim(), venue: draft.venue.trim() });
+          setPhase("permisos");
+        }}
+      >
+        {es.partes.next}
+      </ActionButton>
+    ),
     permisos: (
       <ActionButton onClick={openCamera} disabled={camera.status === "starting"}>
         {es.permisos.action}
       </ActionButton>
     ),
-    listo: <ActionButton onClick={startRecording}>{es.listo.start}</ActionButton>,
+    listo: (
+      <ActionButton tone="dark" onClick={startRecording}>
+        {es.listo.start}
+      </ActionButton>
+    ),
     grabando: (
       <>
         {pending.length > 0 && (
-          <ActionButton onClick={markArrival}>{es.marcar.action(pending[0].title)}</ActionButton>
+          <ActionButton tone="dark" onClick={markArrival}>
+            {es.marcar.action(pending[0].title)}
+          </ActionButton>
         )}
-        <ActionButton variant="danger" onClick={() => recorder.stop("user")}>
+        <ActionButton tone="dark" variant="danger" onClick={() => recorder.stop("user")}>
           {es.grabando.stop}
         </ActionButton>
       </>
@@ -281,11 +302,17 @@ export default function GrabarPage() {
   }[phase];
 
   return (
-    <section className="fixed inset-0 flex flex-col bg-tinta text-niebla">
-      {phase === "listo" || phase === "grabando" ? (
+    <section
+      className={`fixed inset-0 flex flex-col ${
+        cameraPhase ? "bg-tinta text-niebla" : "bg-niebla text-tinta"
+      }`}
+    >
+      {cameraPhase ? (
         <div className="relative min-h-0 flex-1 overflow-hidden">
           <CameraPreview stream={camera.stream} videoRef={camera.videoRef} />
-          {phase === "grabando" && <RecordingClock remainingSec={recorder.remainingSec} />}
+          {phase === "grabando" && (
+            <RecordingBar remainingSec={recorder.remainingSec} maxSec={RECORDING.maxDurationSec} />
+          )}
           <WarningStack active={{ luz: light.active, movimiento: motion.active }} />
           {phase === "listo" && (
             <p className="absolute inset-x-4 bottom-4 rounded-2xl bg-tinta/80 px-4 py-3 text-center text-lg">
@@ -293,11 +320,10 @@ export default function GrabarPage() {
             </p>
           )}
           {phase === "grabando" && plan && (
-            <p className="absolute inset-x-4 bottom-4 rounded-2xl bg-tinta/80 px-4 py-3 text-center text-lg">
-              {pending.length === 0
-                ? es.marcar.done
-                : `${es.marcar.progress(marks.length, plan.parts.length)} · ${es.marcar.hint}`}
-            </p>
+            <>
+              <CoachCard nextPart={pending[0]?.title ?? null} />
+              <StepRail parts={plan.parts} done={marks.length} />
+            </>
           )}
           {debug && (
             <DebugPanel

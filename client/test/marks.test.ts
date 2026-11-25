@@ -1,7 +1,14 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { CATALOGUE, markAt, PAUSE_MS, whyNotSendable } from "../lib/pure/marks.ts";
+import {
+  CATALOGUE,
+  markAt,
+  MIN_MARKS,
+  PAUSE_MS,
+  planProblem,
+  whyNotSendable,
+} from "../lib/pure/marks.ts";
 
 const PART = { title: "Entrada", category: "entrance" as const };
 
@@ -56,4 +63,15 @@ test("the last mark needs the arrival pause to fit before the video ends", () =>
   const marks = [markAt(PART, 0), markAt(PART, 59_900)];
   assert.ok(whyNotSendable(marks, 60) !== null);
   assert.equal(PAUSE_MS, 3000);
+});
+
+test("a plan needs a venue before anything else", () => {
+  assert.equal(planProblem("", 3), "venue");
+  assert.equal(planProblem("   ", 3), "venue");
+});
+
+test("a plan needs at least two parts", () => {
+  assert.equal(planProblem("Centro de Salud Oeste", 0), "parts");
+  assert.equal(planProblem("Centro de Salud Oeste", 1), "parts");
+  assert.equal(planProblem("Centro de Salud Oeste", MIN_MARKS), null);
 });

@@ -2,24 +2,42 @@ import type { ReactNode } from "react";
 
 import { es } from "../../lib/i18n/es.ts";
 import { countByType, type RecordingAlert } from "../../lib/pure/alerts.ts";
+import { ProgressSegments } from "../controls.tsx";
+import { DocumentIcon, PeopleIcon, SunIcon, WalkIcon } from "../icons.tsx";
+import { Card } from "../ui.tsx";
 
-/** Big primary button, always in the same footer slot (min 56 px tall). */
+/**
+ * Big primary button, always in the same footer slot (min 56 px tall).
+ *
+ * Two tones, because the recorder has two kinds of screen: the camera ones are dark, and over a
+ * live preview the action has to be the lightest thing on screen; every other screen is light
+ * like the rest of the product, and there the action is the brand green.
+ */
 export function ActionButton({
   children,
   onClick,
   variant = "primary",
   disabled,
+  tone = "light",
 }: {
   children: ReactNode;
   onClick: () => void;
   variant?: "primary" | "secondary" | "danger";
   disabled?: boolean;
+  tone?: "light" | "dark";
 }) {
-  const colors = {
-    primary: "bg-niebla text-tinta",
-    secondary: "bg-white/15 text-niebla",
-    danger: "bg-coral text-white",
-  }[variant];
+  const colors =
+    tone === "dark"
+      ? {
+          primary: "bg-niebla text-tinta",
+          secondary: "bg-white/15 text-niebla",
+          danger: "bg-coral text-white",
+        }[variant]
+      : {
+          primary: "bg-pino text-sobre-pino",
+          secondary: "bg-tarjeta text-pino border-2 border-pino",
+          danger: "bg-coral text-white",
+        }[variant];
   return (
     <button
       type="button"
@@ -32,23 +50,61 @@ export function ActionButton({
   );
 }
 
-export function Message({ title, children }: { title: string; children?: ReactNode }) {
+export function Message({
+  title,
+  step,
+  children,
+}: {
+  title: string;
+  /** "Paso 1 de 3": where this screen sits in the three the design numbers. */
+  step?: { label: string; current: number };
+  children?: ReactNode;
+}) {
   return (
-    <div className="flex flex-1 flex-col justify-center gap-4 overflow-y-auto p-6">
-      <h1 className="text-3xl font-bold">{title}</h1>
+    <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-6">
+      {step && (
+        <div>
+          <p className="mb-2 text-center text-lg font-bold">{step.label}</p>
+          <ProgressSegments total={3} current={step.current} />
+        </div>
+      )}
+      <h1 className="text-4xl font-extrabold">{title}</h1>
       {children}
     </div>
   );
 }
 
+const TIP_ICONS: Record<string, ReactNode> = {
+  luz: <SunIcon size={26} />,
+  gente: <PeopleIcon size={26} />,
+  andar: <WalkIcon size={26} />,
+  cartel: <DocumentIcon size={26} />,
+};
+
 export function IntroScreen() {
   return (
-    <Message title={es.intro.title}>
-      <p className="text-lg text-niebla/80">{es.intro.lead}</p>
-      <ul className="flex flex-col gap-3 text-lg">
+    <Message title={es.intro.title} step={{ label: es.intro.step, current: 1 }}>
+      <p className="text-xl text-tinta/70">{es.intro.lead}</p>
+      <ul className="grid gap-3">
         {es.intro.tips.map((tip) => (
-          <li key={tip} className="rounded-2xl bg-niebla/10 px-4 py-3">
-            {tip}
+          <li key={tip.title}>
+            <Card className="flex items-start gap-4">
+              <span
+                className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl ${
+                  tip.icon === "luz" ? "bg-ambar/35 text-sobre-ambar" : "bg-salvia text-pino"
+                }`}
+              >
+                {TIP_ICONS[tip.icon]}
+              </span>
+              {/* The body is a size down from the page text on purpose: these are four cards to
+                  skim before recording, not the easy-read text of the guide itself. */}
+              <span className="min-w-0">
+                <span className="block text-lg font-bold">{tip.title}</span>
+                <span className="mt-0.5 block text-base leading-snug text-tinta/70">
+                  {tip.body}
+                </span>
+              </span>
+            </Card>
           </li>
         ))}
       </ul>
@@ -58,9 +114,11 @@ export function IntroScreen() {
 
 export function PermissionScreen({ starting, resumed }: { starting: boolean; resumed: boolean }) {
   return (
-    <Message title={es.permisos.title}>
-      <p className="text-lg text-niebla/80">{starting ? es.permisos.starting : es.permisos.lead}</p>
-      {resumed && <p className="text-base text-ambar">{es.permisos.resumed}</p>}
+    <Message title={es.permisos.title} step={{ label: es.intro.step, current: 1 }}>
+      <p className="text-xl text-tinta/70">{starting ? es.permisos.starting : es.permisos.lead}</p>
+      {resumed && (
+        <p className="rounded-2xl bg-ambar/35 px-4 py-3 text-sobre-ambar">{es.permisos.resumed}</p>
+      )}
     </Message>
   );
 }
@@ -88,21 +146,23 @@ export function ReviewScreen({
 }) {
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-4">
-      <h1 className="text-2xl font-bold">{es.revision.title}</h1>
+      <h1 className="text-3xl font-extrabold">{es.revision.title}</h1>
       <video
         src={url}
-        className="max-h-[55vh] w-full rounded-2xl bg-tinta object-contain"
+        className="max-h-[50vh] w-full rounded-2xl bg-tinta object-contain"
         controls
         playsInline
       />
       {problem && (
-        <div className="rounded-2xl bg-ambar/25 px-4 py-3" role="alert">
-          <p className="text-lg font-bold text-ambar">{es.revision.cannotSend}</p>
-          <p className="mt-1 text-base text-niebla/90">{problem}</p>
+        <div className="rounded-2xl bg-ambar/35 px-4 py-3" role="alert">
+          <p className="text-lg font-bold text-sobre-ambar">{es.revision.cannotSend}</p>
+          <p className="mt-1 text-tinta">{problem}</p>
         </div>
       )}
-      {notice && <p className="rounded-2xl bg-ambar/20 px-4 py-3 text-base text-ambar">{notice}</p>}
-      <p className="text-base text-niebla/80">
+      {notice && (
+        <p className="rounded-2xl bg-ambar/25 px-4 py-3 text-sobre-ambar">{notice}</p>
+      )}
+      <p className="text-tinta/70">
         <span className="font-bold">{es.revision.alertsTitle}: </span>
         {alertSummary(alerts)}
       </p>
@@ -110,21 +170,50 @@ export function ReviewScreen({
   );
 }
 
+/**
+ * While the recording travels and the guide is assembled.
+ *
+ * The stages are named rather than hidden behind a spinner: "Difuminando las caras" is the
+ * promise this product makes, and seeing it happen is part of trusting it.
+ */
 export function SendingScreen({ progress }: { progress: number }) {
   const percent = Math.round(progress * 100);
+  const reached = Math.round((percent / 100) * es.proceso.stages.length);
+
   return (
-    <Message title={es.enviando.title}>
+    <Message title={es.proceso.title} step={{ label: es.proceso.step, current: 3 }}>
+      <p className="text-5xl font-extrabold text-pino tabular-nums">{percent}%</p>
       <div
-        className="h-4 w-full overflow-hidden rounded-full bg-white/15"
+        className="h-3 w-full overflow-hidden rounded-full bg-salvia"
         role="progressbar"
         aria-valuemin={0}
         aria-valuemax={100}
         aria-valuenow={percent}
       >
-        <div className="h-full bg-white transition-[width] duration-300" style={{ width: `${percent}%` }} />
+        <div className="h-full bg-pino" style={{ width: `${percent}%` }} />
       </div>
-      <p className="text-lg tabular-nums">{percent}%</p>
-      <p className="text-base text-niebla/70">{es.enviando.keepOpen}</p>
+      <p className="text-tinta/70">{es.proceso.lead}</p>
+
+      <Card>
+        <ul className="grid gap-3">
+          {es.proceso.stages.map((stage, index) => {
+            const done = index < reached;
+            return (
+              <li key={stage} className="flex items-center gap-3">
+                <span
+                  aria-hidden="true"
+                  className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full border-2 text-sm font-bold ${
+                    done ? "border-pino bg-pino text-sobre-pino" : "border-tinta/25 text-tinta/40"
+                  }`}
+                >
+                  {done ? "✓" : ""}
+                </span>
+                <span className={done ? "font-bold" : "text-tinta/60"}>{stage}</span>
+              </li>
+            );
+          })}
+        </ul>
+      </Card>
     </Message>
   );
 }
@@ -132,7 +221,7 @@ export function SendingScreen({ progress }: { progress: number }) {
 export function DoneScreen({ videoSent }: { videoSent: boolean }) {
   return (
     <Message title={es.hecho.title}>
-      <p className="text-lg text-niebla/80">{videoSent ? es.hecho.leadSent : es.hecho.lead}</p>
+      <p className="text-xl text-tinta/70">{videoSent ? es.hecho.leadSent : es.hecho.lead}</p>
     </Message>
   );
 }
@@ -140,7 +229,7 @@ export function DoneScreen({ videoSent }: { videoSent: boolean }) {
 export function ErrorScreen({ message }: { message: string }) {
   return (
     <Message title={es.error.title}>
-      <p className="text-lg text-niebla/80" role="alert">
+      <p className="text-xl text-tinta/80" role="alert">
         {message}
       </p>
     </Message>
