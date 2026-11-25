@@ -18,7 +18,7 @@ from datetime import UTC, datetime
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from db.models import Guide, Step
+from db.models import Guide, Route, Step
 
 DEFAULT_PAGE_SIZE = 20
 
@@ -50,13 +50,85 @@ def create(
         status="draft",
         video_duration_seconds=video_duration_seconds,
     )
-    guide.steps = [Step(**step) for step in steps]
+    route = Route(position=1, title=title, video_duration_seconds=video_duration_seconds)
+    route.steps = [Step(**step) for step in steps]
+    guide.routes = [route]
+    guide.steps = list(route.steps)
     session.add(guide)
     session.flush()
     return guide
 
 
-def _steps_from_marks(marks: Iterable[dict], video_duration_seconds: float) -> list[dict]:
+def add_route(
+    session: Session,
+    guide: Guide,
+    *,
+    title: str,
+    marks: Iterable[dict],
+    video_duration_seconds: float,
+) -> Route:
+    """Add another recording to a guide, with one step per mark.
+
+    The steps continue the guide's numbering, so "paso 3 de 7" keeps meaning something across
+    routes. The guide goes back to waiting for a video: the new route has none yet.
+    """
+    if not guide.routes:
+        latest_route(guide)  # a guide older than routes keeps its steps in route 1
+    first = max((step.position for step in guide.steps), default=0) + 1
+    steps = _steps_from_marks(marks, video_duration_seconds, first_position=first)
+    route = Route(
+        guide_id=guide.id,
+        position=max((one.position for one in guide.routes), default=0) + 1,
+        title=title,
+        video_duration_seconds=video_duration_seconds,
+    )
+    route.steps = [Step(**step) for step in steps]
+    guide.routes.append(route)
+    guide.steps.extend(route.steps)
+    guide.processing_status = "pending"
+    guide.video_duration_seconds = sum(
+        one.video_duration_seconds or 0.0 for one in guide.routes
+    )
+    session.flush()
+    return route
+
+
+def route_of(guide: Guide, route_id: uuid.UUID) -> Route | None:
+    return next((route for route in guide.routes if route.id == route_id), None)
+
+
+def latest_route(guide: Guide) -> Route:
+    """The route a video without a route named belongs to: the last one added.
+
+    A guide older than routes has none yet; it gets one holding all its steps, so every guide can
+    be handled the same way from here on.
+    """
+    if not guide.routes:
+        route = Route(guide_id=guide.id, position=1, title=guide.title,
+                      video_duration_seconds=guide.video_duration_seconds,
+                      processing_status=guide.processing_status)
+        guide.routes.append(route)
+        route.steps = list(guide.steps)
+    return guide.routes[-1]
+
+
+def media_paths(guide: Guide) -> list[str]:
+    """Every file this guide keeps in storage."""
+    paths = []
+    for step in guide.steps:
+        paths += [path for path in (step.clip_path, step.photo_path, step.sound_path) if path]
+    return paths
+
+
+def delete(session: Session, guide: Guide) -> None:
+    """Remove a guide with its routes and steps. The caller removes the files from storage first."""
+    session.delete(guide)
+    session.flush()
+
+
+def _steps_from_marks(
+    marks: Iterable[dict], video_duration_seconds: float, first_position: int = 1
+) -> list[dict]:
     """Turn the marks into stretches of video: each step runs until the next mark."""
     marks = list(marks)
     if len(marks) < MIN_MARKS:
@@ -79,7 +151,7 @@ def _steps_from_marks(marks: Iterable[dict], video_duration_seconds: float) -> l
             # Clamped, because a step can be shorter than the pause itself.
             "photo_second": min(mark["marked_at_seconds"] + PAUSE_SECONDS / 2, end),
         }
-        for position, (mark, end) in enumerate(zip(marks, ends, strict=False), start=1)
+        for position, (mark, end) in enumerate(zip(marks, ends, strict=False), start=first_position)
     ]
 
 

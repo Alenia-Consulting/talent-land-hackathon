@@ -99,6 +99,47 @@ class Guide(TimestampMixin, Base):
         cascade="all, delete-orphan",
         order_by="Step.position",
     )
+    routes: Mapped[list["Route"]] = relationship(
+        back_populates="guide",
+        cascade="all, delete-orphan",
+        order_by="Route.position",
+    )
+
+
+class Route(TimestampMixin, Base):
+    """One recording of a guide: a walk through part of the place, with its own video and steps.
+
+    A guide is the place ("Hospital Trinidad"); it can have several routes ("Entrada principal",
+    "Sala de rayos X"), each recorded and processed on its own. Steps keep one numbering across the
+    whole guide, so the visitor's "paso 3 de 7" still makes sense with more than one route.
+    """
+
+    __tablename__ = "routes"
+    __table_args__ = (
+        UniqueConstraint("guide_id", "position", name="uq_routes_guide_id_position"),
+        CheckConstraint(
+            "processing_status IN ('pending', 'processing', 'done', 'failed')",
+            name="processing_status_is_known",
+        ),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    guide_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("guides.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    position: Mapped[int] = mapped_column(Integer, nullable=False)
+    title: Mapped[str] = mapped_column(String(120), nullable=False)
+    video_duration_seconds: Mapped[float | None] = mapped_column(Float)
+    processing_status: Mapped[str] = mapped_column(
+        String(12), nullable=False, server_default="pending"
+    )
+
+    guide: Mapped["Guide"] = relationship(back_populates="routes")
+    # No delete-orphan here: a step already belongs to its guide, and two owners that can each
+    # orphan it would make a step without a route (older rows) impossible to save.
+    steps: Mapped[list["Step"]] = relationship(
+        back_populates="route", cascade="save-update, merge", order_by="Step.position"
+    )
 
 
 STEP_CATEGORIES = (
@@ -157,6 +198,11 @@ class Step(TimestampMixin, Base):
         ForeignKey("guides.id", ondelete="CASCADE"), nullable=False, index=True
     )
     position: Mapped[int] = mapped_column(Integer, nullable=False)
+    # The recording this step was cut from. Null only on rows older than routes, which are given a
+    # route the first time their guide is touched.
+    route_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("routes.id", ondelete="CASCADE"), index=True
+    )
 
     # Written by Gemini, corrected by the venue.
     title: Mapped[str] = mapped_column(String(60), nullable=False)
@@ -210,3 +256,4 @@ class Step(TimestampMixin, Base):
     pictogram_url: Mapped[str | None] = mapped_column(Text)
 
     guide: Mapped["Guide"] = relationship(back_populates="steps")
+    route: Mapped["Route | None"] = relationship(back_populates="steps")

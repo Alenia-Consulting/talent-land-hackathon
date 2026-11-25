@@ -8,6 +8,7 @@ Uses urllib rather than an HTTP library so the API keeps its dependency list sho
 injectable, which is what lets the tests run without a Supabase project.
 """
 
+import json
 import os
 import urllib.error
 import urllib.request
@@ -75,6 +76,35 @@ def upload(
         raise StorageError(f"storage refused the upload: HTTP {status}")
 
     return path
+
+
+def _delete(url: str, body: dict, headers: dict[str, str]) -> int:
+    request = urllib.request.Request(url, data=json.dumps(body).encode(), headers=headers, method="DELETE")
+    try:
+        with urllib.request.urlopen(request, timeout=UPLOAD_TIMEOUT_SECONDS) as response:
+            return response.status
+    except urllib.error.HTTPError as error:
+        return error.code
+    except (urllib.error.URLError, TimeoutError) as error:
+        raise StorageError(f"storage could not be reached: {error}") from error
+
+
+def remove(
+    config: StorageConfig,
+    paths: list[str],
+    *,
+    send: Callable[[str, dict, dict[str, str]], int] = _delete,
+) -> None:
+    """Delete these files from the bucket. A path that is already gone is not an error."""
+    if not paths:
+        return
+    status = send(
+        f"{config.url.rstrip('/')}/storage/v1/object/{config.bucket}",
+        {"prefixes": paths},
+        {"Authorization": f"Bearer {config.key}", "Content-Type": "application/json"},
+    )
+    if status >= 400:
+        raise StorageError(f"storage refused the deletion: HTTP {status}")
 
 
 def public_url(path: str | None) -> str | None:

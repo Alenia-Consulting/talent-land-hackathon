@@ -45,7 +45,14 @@ export interface paths {
         get: operations["read_guide_guides__guide_id__get"];
         put?: never;
         post?: never;
-        delete?: never;
+        /**
+         * Delete Guide
+         * @description Remove a guide, published or not, with its steps and every file it keeps in storage.
+         *
+         *     The files go first: if storage refuses, the guide stays and can be deleted again, instead of
+         *     leaving clips and photos of people nobody can reach any more. It cannot be undone.
+         */
+        delete: operations["delete_guide_guides__guide_id__delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -111,6 +118,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/guides/{guide_id}/routes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Add Route
+         * @description Add another recording to a guide that already exists.
+         *
+         *     Same shape as creating a guide, minus the place: the marks become steps that continue the
+         *     guide's numbering, and the video is sent afterwards to `/guides/{id}/routes/{route}/video`.
+         *     Nothing already in the guide is touched.
+         */
+        post: operations["add_route_guides__guide_id__routes_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/guides/{guide_id}/video": {
         parameters: {
             query?: never;
@@ -122,13 +153,35 @@ export interface paths {
         put?: never;
         /**
          * Upload Video
-         * @description Receive the recording, blur the faces and store only the processed media.
+         * @description Send the video of the guide's latest route (the only one, for a guide with one).
+         *
+         *     Kept for the recorder, which sends one video per guide. See the route version below.
+         */
+        post: operations["upload_video_guides__guide_id__video_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/guides/{guide_id}/routes/{route_id}/video": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Upload Route Video
+         * @description Receive the recording of one route, blur the faces and store only the processed media.
          *
          *     The original never reaches storage and is deleted from this server either way: it shows the
          *     faces of patients and staff who did not agree to be filmed. Answers 503 while the blurring is
          *     not implemented, rather than storing a recording nobody has cleaned.
          */
-        post: operations["upload_video_guides__guide_id__video_post"];
+        post: operations["upload_route_video_guides__guide_id__routes__route_id__video_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -179,6 +232,15 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** Body_upload_route_video_guides__guide_id__routes__route_id__video_post */
+        Body_upload_route_video_guides__guide_id__routes__route_id__video_post: {
+            /**
+             * Video
+             * Format: binary
+             * @description The recording, as taken by the phone.
+             */
+            video: string;
+        };
         /** Body_upload_video_guides__guide_id__video_post */
         Body_upload_video_guides__guide_id__video_post: {
             /**
@@ -267,6 +329,11 @@ export interface components {
              * Format: date-time
              */
             updated_at: string;
+            /**
+             * Routes
+             * @description The guide's recordings, in order.
+             */
+            routes: components["schemas"]["RouteOut"][];
             /** Steps */
             steps: components["schemas"]["StepOut"][];
             /** @description Review panel only. The public guide leaves it out. */
@@ -398,6 +465,46 @@ export interface components {
              */
             box_2d: number[];
         };
+        /**
+         * RouteCreate
+         * @description Another recording of a guide that already exists.
+         */
+        RouteCreate: {
+            /**
+             * Title
+             * @description Name of this recording: 'Entrada principal', 'Sala de rayos X'.
+             */
+            title: string;
+            /** Video Duration Seconds */
+            video_duration_seconds: number;
+            /**
+             * Marks
+             * @description Same rules as when creating a guide. The steps continue the guide's numbering.
+             */
+            marks: components["schemas"]["MarkIn"][];
+        };
+        /** RouteOut */
+        RouteOut: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Order
+             * @description 1-based position among the guide's routes.
+             */
+            order: number;
+            /** Title */
+            title: string;
+            /** Video Duration Seconds */
+            video_duration_seconds: number | null;
+            /**
+             * Processing Status
+             * @description pending | processing | done | failed: where this recording is.
+             */
+            processing_status: string;
+        };
         /** StepOut */
         StepOut: {
             /**
@@ -410,6 +517,11 @@ export interface components {
              * @description 1-based position. Stored as `position`: ORDER is reserved in SQL.
              */
             order: number;
+            /**
+             * Route Id
+             * @description The recording this step was cut from. Null only on steps older than routes.
+             */
+            route_id: string | null;
             /** Title */
             title: string;
             /**
@@ -651,6 +763,35 @@ export interface operations {
             };
         };
     };
+    delete_guide_guides__guide_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                guide_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     update_step_guides__guide_id__steps__step_id__patch: {
         parameters: {
             query?: never;
@@ -749,6 +890,41 @@ export interface operations {
             };
         };
     };
+    add_route_guides__guide_id__routes_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                guide_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RouteCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GuideOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     upload_video_guides__guide_id__video_post: {
         parameters: {
             query?: never;
@@ -761,6 +937,42 @@ export interface operations {
         requestBody: {
             content: {
                 "multipart/form-data": components["schemas"]["Body_upload_video_guides__guide_id__video_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GuideOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    upload_route_video_guides__guide_id__routes__route_id__video_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                guide_id: string;
+                route_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_upload_route_video_guides__guide_id__routes__route_id__video_post"];
             };
         };
         responses: {
