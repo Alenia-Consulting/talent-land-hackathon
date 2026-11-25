@@ -66,7 +66,7 @@ class ProcessedStep:
 def process(video: pathlib.Path, steps: Sequence[StepTiming]) -> list[ProcessedStep]:
     """Cut and blur one recording.
 
-    Raises ProcessingFailed when the recording cannot be read or a step has no image, and
+    Raises ProcessingFailed when the recording cannot be read (a step outside it is rescued), and
     ProcessingUnavailable when ffmpeg or the detector is missing.
     """
     with _processing, tempfile.TemporaryDirectory() as workdir:
@@ -87,21 +87,31 @@ def _process_step(video: pathlib.Path, size: video_io.Size, step: StepTiming, wo
     photo_frame = None
 
     with video_io.clip_writer(clip_path, size) as write:
-        frames = video_io.read_frames(video, size, step.start_seconds, step.end_seconds - step.start_seconds)
-        for index, frame in enumerate(frames):
+        length = step.end_seconds - step.start_seconds
+        for index, frame in enumerate(video_io.read_frames(video, size, step.start_seconds, length)):
             blur(frame)
             write(frame)
             # The frame at photo_second, or the last one when the clip ends before it.
             if photo_frame is None or index <= photo_index:
                 photo_frame = frame
+        if photo_frame is None:
+            # The range lies past the end of the file (guides recorded before the duration was
+            # measured): keep the last second of the recording rather than losing the walk.
+            # Measuring decodes the whole file, so only this path pays for it.
+            last_second = max(0.0, video_io.duration(video) - 1.0)
+            for frame in video_io.read_frames(video, size, last_second, 1.0):
+                blur(frame)
+                write(frame)
+                photo_frame = frame
 
     if photo_frame is None:
-        real = video_io.duration(video)
-        detail = (
-            f": empieza en {step.start_seconds:.1f} s y el vídeo dura {real:.1f} s"
-            if real is not None
-            else ""
-        )
+        try:
+            detail = (
+                f": empieza en {step.start_seconds:.1f} s "
+                f"y el vídeo dura {video_io.duration(video):.1f} s"
+            )
+        except ProcessingFailed:
+            detail = ""
         raise ProcessingFailed(f"el paso {step.position} no tiene imagen en el vídeo{detail}")
     encoded, jpeg = cv2.imencode(".jpg", photo_frame, [cv2.IMWRITE_JPEG_QUALITY, JPEG_QUALITY])
     if not encoded:

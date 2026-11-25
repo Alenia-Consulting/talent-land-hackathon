@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { FADE_MS, fadeVolume, TARGET_VOLUME } from "../lib/pure/sound.ts";
+import { FADE_MS, fadeVolume, levelOf, TARGET_VOLUME } from "../lib/pure/sound.ts";
 
 test("the sound starts at silence, never at full volume", () => {
   // Invariant: "empieza muy bajito y sube poco a poco". A first sample above zero is a jump
@@ -41,4 +41,17 @@ test("the volume never leaves what an audio element accepts", () => {
 
 test("the fade is long enough to be a rise and not a click", () => {
   assert.ok(FADE_MS >= 1000);
+});
+
+test("an unknown noise level is not announced as quiet", () => {
+  // The sound sheet IS the noise warning: saying "low" without knowing it breaks it.
+  assert.equal(levelOf({ noise_level: null }), null);
+  assert.equal(levelOf({ noise_level: "loud" }), null);
+  assert.equal(levelOf({}), null);
+});
+
+test("the three known levels are announced as they are", () => {
+  for (const level of ["quiet", "medium", "noisy"] as const) {
+    assert.equal(levelOf({ noise_level: level }), level);
+  }
 });

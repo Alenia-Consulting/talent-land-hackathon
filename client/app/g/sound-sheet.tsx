@@ -9,18 +9,13 @@
 
 import type { Step } from "../../lib/guides.ts";
 import { es } from "../../lib/i18n/es.ts";
+import { levelOf } from "../../lib/pure/sound.ts";
 import { Sheet } from "../controls.tsx";
 import { HeadphonesIcon, VolumeIcon } from "../icons.tsx";
 import { Button, Card, NoiseLevel } from "../ui.tsx";
 
 const t = es.publica;
 
-type Level = keyof typeof t.sound.title;
-
-function levelOf(step: Step): Level {
-  const level = step.noise_level;
-  return level === "medium" || level === "noisy" ? level : "quiet";
-}
 
 export function SoundSheet({
   open,
@@ -36,13 +31,13 @@ export function SoundSheet({
   const level = levelOf(step);
 
   return (
-    <Sheet open={open} onClose={onClose} title={t.sound.title[level]}>
+    <Sheet open={open} onClose={onClose} title={t.sound.title[level ?? "unknown"]}>
       <div className="flex items-start gap-4">
         <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-ambar/35 text-sobre-ambar">
           <VolumeIcon size={30} />
         </span>
         <div className="min-w-0">
-          <h2 className="text-3xl font-extrabold">{t.sound.title[level]}</h2>
+          <h2 className="text-3xl font-extrabold">{t.sound.title[level ?? "unknown"]}</h2>
           <p className="mt-1 text-tinta/70">{t.sound.subtitle(step.title)}</p>
         </div>
       </div>
@@ -50,7 +45,7 @@ export function SoundSheet({
       <p className="mt-5 text-xl">{t.sound.lead}</p>
 
       <Card className="mt-5 flex flex-wrap items-center gap-3">
-        <NoiseLevel level={level} label={t.noise[level]} />
+        {level && <NoiseLevel level={level} label={t.noise[level]} />}
         {step.duration_text && <span className="text-tinta/70">{step.duration_text}</span>}
       </Card>
 

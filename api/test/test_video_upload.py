@@ -8,7 +8,8 @@ import io
 import pathlib
 import uuid
 
-from media import faces, pipeline, storage
+from db import guides
+from media import faces, pipeline, storage, video_io
 from media_fixtures import make_video
 
 
@@ -117,8 +118,9 @@ def test_a_real_recording_is_blurred_before_anything_reaches_storage(
     response = upload(client, guide.id, content=recording)
 
     assert response.status_code == 200, response.text
-    assert set(stored) == {f"{guide.id}/paso-1.mp4", f"{guide.id}/paso-1.jpg"}
-    photo = cv2.imdecode(np.frombuffer(stored[f"{guide.id}/paso-1.jpg"], np.uint8), cv2.IMREAD_COLOR)
+    base = f"{guide.id}/{guide.steps[0].id}"
+    assert set(stored) == {f"{base}.mp4", f"{base}.jpg"}
+    photo = cv2.imdecode(np.frombuffer(stored[f"{base}.jpg"], np.uint8), cv2.IMREAD_COLOR)
     assert faces.find_faces(photo) == []
     assert list((tmp_path / "uploads").iterdir()) == []
 
@@ -161,19 +163,21 @@ def test_the_processed_media_reaches_storage_and_the_steps(
     response = upload(client, guide.id)
 
     assert response.status_code == 200, response.text
-    # The id, not the slug: the slug only exists once published and the path must not move then.
-    assert uploaded == [f"{guide.id}/paso-1.mp4", f"{guide.id}/paso-1.jpg", f"{guide.id}/paso-1.mp3"]
+    # The ids, not the slug or the position: neither is stable once the guide is published or a
+    # route is inserted.
+    stem = f"{guide.id}/{guide.steps[0].id}"
+    assert uploaded == [f"{stem}.mp4", f"{stem}.jpg", f"{stem}.mp3"]
 
     step = response.json()["steps"][0]
     base = "https://p.supabase.co/storage/v1/object/public/guides"
-    assert step["clip_url"] == f"{base}/{guide.id}/paso-1.mp4"
-    assert step["photo_url"] == f"{base}/{guide.id}/paso-1.jpg"
+    assert step["clip_url"] == f"{base}/{stem}.mp4"
+    assert step["photo_url"] == f"{base}/{stem}.jpg"
     # The database keeps the path, not the URL.
     db_session.refresh(guide)
-    assert guide.steps[0].clip_path == f"{guide.id}/paso-1.mp4"
+    assert guide.steps[0].clip_path == f"{stem}.mp4"
     assert step["sound_available"] is True
-    assert step["sound_url"] == f"{base}/{guide.id}/paso-1.mp3"
-    assert guide.steps[0].sound_path == f"{guide.id}/paso-1.mp3"
+    assert step["sound_url"] == f"{base}/{stem}.mp3"
+    assert guide.steps[0].sound_path == f"{stem}.mp3"
     assert step["noise_level"] == "noisy"
     # Measured by the pipeline, not corrected by a person: the panel shows the difference.
     assert step["noise_level_source"] == "measured"
@@ -279,6 +283,82 @@ def test_a_recording_already_being_processed_is_refused(client, db_session, make
     response = upload(client, guide.id)
 
     assert response.status_code == 409
+
+
+def _two_part_guide(db_session):
+    guide = guides.create(
+        db_session, title="Recorrido principal", venue_name="Centro Trinidad",
+        marks=[{"title": "Entrada", "category": "entrance", "marked_at_seconds": 0.0},
+               {"title": "Recepción", "category": "reception", "marked_at_seconds": 12.0}],
+        video_duration_seconds=30.0,
+    )
+    db_session.commit()
+    return guide
+
+
+def test_the_steps_reach_the_pipeline_on_the_timeline_of_the_file(
+    client, db_session, monkeypatch, tmp_path
+):
+    """The phone said 30 s; the file lasts 20 s. Only retiming can produce what the pipeline gets."""
+    guide = _two_part_guide(db_session)
+    monkeypatch.setattr("routers.guides.UPLOAD_DIR", tmp_path)
+    monkeypatch.setattr(video_io, "duration", lambda video: 20.0)
+    received = []
+
+    def refuse(video, timings):
+        received.extend(timings)
+        raise pipeline.ProcessingFailed("stop here")
+
+    monkeypatch.setattr("media.pipeline.process", refuse)
+
+    upload(client, guide.id)
+
+    assert [(t.start_seconds, t.end_seconds, t.photo_second) for t in received] == [
+        (0.0, 12.0, 6.0),
+        (12.0, 20.0, 16.0),  # before: (12.0, 30.0, 13.5)
+    ]
+
+
+def test_a_recording_that_cannot_be_measured_marks_the_route_failed(
+    client, db_session, monkeypatch, tmp_path
+):
+    guide = _two_part_guide(db_session)
+    monkeypatch.setattr("routers.guides.UPLOAD_DIR", tmp_path)
+
+    def unreadable(video):
+        raise video_io.ProcessingFailed("no se pudo leer el vídeo")
+
+    monkeypatch.setattr(video_io, "duration", unreadable)
+
+    response = upload(client, guide.id)
+
+    assert response.status_code == 422
+    assert response.json()["detail"] == "no se pudo leer el vídeo"
+    db_session.refresh(guide)
+    assert guide.routes[0].processing_status == "failed"
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_a_mark_past_the_real_end_of_the_file_is_still_processed(
+    client, db_session, monkeypatch, tmp_path
+):
+    """The part marked at 12 s of a 5 s file keeps its last second instead of failing the upload."""
+    guide = _two_part_guide(db_session)
+    monkeypatch.setattr("routers.guides.UPLOAD_DIR", tmp_path)
+    monkeypatch.setattr(video_io, "duration", lambda video: 5.0)
+    monkeypatch.setattr("media.pipeline.process", lambda video, steps: [
+        pipeline.ProcessedStep(position=n, clip=b"c", photo=b"p", sound=None, noise_level=None)
+        for n in (1, 2)])
+    monkeypatch.setattr("media.storage.config_from_env",
+                        lambda: storage.StorageConfig(url="https://p.supabase.co", key="k"))
+    monkeypatch.setattr("media.storage.upload", lambda config, path, *a, **kw: path)
+
+    response = upload(client, guide.id)
+
+    assert response.status_code == 200, response.text
+    db_session.refresh(guide)
+    assert [(s.start_seconds, s.end_seconds) for s in guide.routes[0].steps] == [
+        (0.0, 5.0), (4.0, 5.0)]
 
 
 def test_why_a_recording_failed_is_logged(client, db_session, make_guide, caplog):

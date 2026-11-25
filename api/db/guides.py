@@ -16,7 +16,7 @@ from collections.abc import Iterable
 from datetime import UTC, datetime
 
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, object_session
 
 from db.models import Guide, Route, Step
 
@@ -26,6 +26,8 @@ DEFAULT_PAGE_SIZE = 20
 # is in the middle of that pause, and that is also the stretch where the noise is measured.
 PAUSE_SECONDS = 3.0
 MIN_MARKS = 1
+# The shortest clip a step keeps when its mark lands past the end of the file.
+MIN_STEP_SECONDS = 1.0
 
 
 def create(
@@ -36,11 +38,13 @@ def create(
     marks: Iterable[dict],
     video_duration_seconds: float,
     language: str = "es",
+    route_title: str | None = None,
 ) -> Guide:
     """Store a new guide as a draft, with one step per mark.
 
     The steps have no text yet: Gemini writes it afterwards and a person reviews it. Only a human
-    publishes the result.
+    publishes the result. The first route is named after its part when `route_title` comes, and
+    after the guide otherwise.
     """
     steps = _steps_from_marks(marks, video_duration_seconds)
     guide = Guide(
@@ -50,7 +54,8 @@ def create(
         status="draft",
         video_duration_seconds=video_duration_seconds,
     )
-    route = Route(position=1, title=title, video_duration_seconds=video_duration_seconds)
+    route = Route(position=1, title=route_title or title,
+                  video_duration_seconds=video_duration_seconds)
     route.steps = [Step(**step) for step in steps]
     guide.routes = [route]
     guide.steps = list(route.steps)
@@ -66,31 +71,91 @@ def add_route(
     title: str,
     marks: Iterable[dict],
     video_duration_seconds: float,
+    position: int | None = None,
 ) -> Route:
     """Add another recording to a guide, with one step per mark.
 
-    The steps continue the guide's numbering, so "paso 3 de 7" keeps meaning something across
-    routes. The guide goes back to waiting for a video: the new route has none yet.
+    Without a position it goes last. With one it enters there and the routes after it move down;
+    either way the steps of the whole guide are renumbered, so "paso 3 de 7" keeps meaning
+    something. The guide goes back to waiting for a video: the new route has none yet.
     """
     if not guide.routes:
         latest_route(guide)  # a guide older than routes keeps its steps in route 1
-    first = max((step.position for step in guide.steps), default=0) + 1
-    steps = _steps_from_marks(marks, video_duration_seconds, first_position=first)
-    route = Route(
-        guide_id=guide.id,
-        position=max((one.position for one in guide.routes), default=0) + 1,
-        title=title,
-        video_duration_seconds=video_duration_seconds,
-    )
-    route.steps = [Step(**step) for step in steps]
-    guide.routes.append(route)
-    guide.steps.extend(route.steps)
+    steps = _steps_from_marks(marks, video_duration_seconds)
+    # Positions are unique per guide and the new rows start at 1: nothing may be flushed until
+    # _renumber has moved every row out of the way.
+    with session.no_autoflush:
+        last = max((one.position for one in guide.routes), default=0) + 1
+        place = last if position is None else min(position, last)
+        for one in guide.routes:
+            if one.position >= place:
+                one.position += 1
+        route = Route(
+            guide_id=guide.id,
+            position=place,
+            title=title,
+            video_duration_seconds=video_duration_seconds,
+        )
+        route.steps = [Step(**step) for step in steps]
+        guide.routes.append(route)
+        guide.steps.extend(route.steps)
+    _renumber(guide)
     guide.processing_status = "pending"
     guide.video_duration_seconds = sum(
         one.video_duration_seconds or 0.0 for one in guide.routes
     )
     session.flush()
     return route
+
+
+def _renumber(guide: Guide) -> None:
+    """Number the routes 1..n and, following that order, the steps of the guide 1..m.
+
+    Only numbers: durations and everything else stay where they are. The positions are unique per
+    guide, so they first move out of the way (to negatives) and are flushed; otherwise two rows
+    would briefly share a number and the database would refuse.
+    """
+    session = object_session(guide)  # a guide being renumbered always lives in one
+    with session.no_autoflush:
+        routes = sorted(guide.routes, key=lambda one: one.position)
+        steps = [step for one in routes for step in sorted(one.steps, key=lambda s: s.position)]
+    # DO NOT REMOVE. uq_steps_guide_id_position and uq_routes_guide_id_position are plain UNIQUE,
+    # which Postgres checks per statement, so shifting 1->2, 2->3 collides. Park every row at a
+    # negative position and flush first. SQLite cannot reproduce the collision: a green test run
+    # is not evidence that this step can go.
+    for index, row in enumerate([*routes, *steps], start=1):
+        row.position = -index
+    session.flush()
+    for number, one in enumerate(routes, start=1):
+        one.position = number
+    for number, step in enumerate(steps, start=1):
+        step.position = number
+
+
+def retime_route(route: Route, measured_seconds: float) -> None:
+    """Move the route's steps onto the real timeline of the file that was uploaded.
+
+    The phone sends the wall-clock time between Record and Stop, which is not the length of the
+    file: the encoder usually ends earlier. Each step still starts where its mark says and runs
+    until the next one; the last runs to the end of the file, and nothing goes past it. No step
+    is shorter than MIN_STEP_SECONDS (or the whole file, if that is shorter).
+    """
+    steps = sorted(route.steps, key=lambda step: step.position)
+    floor = min(MIN_STEP_SECONDS, measured_seconds)
+    for step, following in zip(steps, [*steps[1:], None], strict=False):
+        step.start_seconds = min(step.start_seconds, measured_seconds)
+        step.end_seconds = (
+            measured_seconds if following is None
+            else min(following.start_seconds, measured_seconds)
+        )
+        if step.end_seconds - step.start_seconds < floor:
+            # A mark past the real end keeps a short clip at the tail; the end never moves.
+            step.start_seconds = max(0.0, step.end_seconds - floor)
+        step.photo_second = (step.start_seconds + step.end_seconds) / 2
+    route.video_duration_seconds = measured_seconds
+    route.guide.video_duration_seconds = sum(
+        one.video_duration_seconds or 0.0 for one in route.guide.routes
+    )
 
 
 def route_of(guide: Guide, route_id: uuid.UUID) -> Route | None:
@@ -114,10 +179,35 @@ def latest_route(guide: Guide) -> Route:
 
 def media_paths(guide: Guide) -> list[str]:
     """Every file this guide keeps in storage."""
+    return _step_paths(guide.steps)
+
+
+def route_media_paths(route: Route) -> list[str]:
+    """Every file the steps of this recording keep in storage."""
+    return _step_paths(route.steps)
+
+
+def _step_paths(steps: Iterable[Step]) -> list[str]:
     paths = []
-    for step in guide.steps:
+    for step in steps:
         paths += [path for path in (step.clip_path, step.photo_path, step.sound_path) if path]
     return paths
+
+
+def delete_route(session: Session, guide: Guide, route: Route) -> None:
+    """Remove one recording with its steps, and close the gap it leaves.
+
+    The steps and routes that remain are renumbered from 1 (the numbering is one for the whole
+    guide, so a hole would break "paso 3 de 7") and the guide's duration is the sum of what is
+    left. The caller removes the files from storage first.
+    """
+    for step in list(route.steps):
+        guide.steps.remove(step)
+    guide.routes.remove(route)
+    session.flush()
+    _renumber(guide)
+    guide.video_duration_seconds = sum(one.video_duration_seconds or 0.0 for one in guide.routes)
+    session.flush()
 
 
 def delete(session: Session, guide: Guide) -> None:
@@ -148,6 +238,12 @@ def _steps_from_marks(
             "category": mark["category"],
             "start_seconds": mark["marked_at_seconds"],
             "end_seconds": end,
+            # What the person said about the sound; without it the step has no level at all.
+            **(
+                {"noise_level": mark["noise_level"], "noise_level_source": "manual"}
+                if mark.get("noise_level")
+                else {}
+            ),
             # Clamped, because a step can be shorter than the pause itself.
             "photo_second": min(mark["marked_at_seconds"] + PAUSE_SECONDS / 2, end),
         }

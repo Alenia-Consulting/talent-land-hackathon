@@ -9,7 +9,7 @@ from media import audio, pipeline, video_io
 from media_fixtures import make_video
 
 # Loud for the first two seconds, quiet afterwards: two places in one recording.
-LOUD_THEN_QUIET = "anoisesrc=c=pink:r=16000:a=0.8|volume='if(lt(t,2),1,0.05)':eval=frame"
+LOUD_THEN_QUIET = "anoisesrc=c=pink:r=16000:a=0.8:seed=7|volume='if(lt(t,2),1,0.05)':eval=frame"
 
 
 def spectrum(mp3: bytes, tmp_path):
@@ -57,7 +57,9 @@ def test_the_level_is_relative_to_the_rest_of_the_same_recording(tmp_path):
     loud = audio.mean_power(video, 0, 2)
     quiet = audio.mean_power(video, 2, 4)
 
-    assert loud > quiet * 20  # well past the +-2.5 dB band
+    # 10 dB apart, four times the +-2.5 dB band. The noise is seeded: unseeded, the ratio wandered
+    # around 20 and a strict threshold failed one run in ten.
+    assert loud > quiet * 10
     assert audio.classify({1: loud, 2: quiet}) == {1: "noisy", 2: "quiet"}
 
 

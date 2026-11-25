@@ -269,3 +269,168 @@ def test_the_catalogue_is_one_page_at_a_time(db_session, make_guide):
 
     assert len(guides.list_published(db_session, limit=2)) == 2
     assert [g.venue_name for g in guides.list_published(db_session, limit=2, offset=2)] == ["Centro 2"]
+
+
+# `make_guide` builds a bare Guide, with no routes or steps: a guide with routes is built here.
+def _one_take(db_session, seconds: float):
+    return guides.create(db_session, title="Recorrido principal", venue_name="Centro Trinidad",
+                         marks=[{"title": "Entrada", "category": "entrance",
+                                 "marked_at_seconds": 0.0}],
+                         video_duration_seconds=seconds)
+
+
+def test_retiming_stretches_a_step_when_the_file_is_longer(db_session):
+    """El reloj del móvil se queda corto al llegar al tope: la cola no se pierde."""
+    route = _one_take(db_session, 120.0).routes[0]
+
+    guides.retime_route(route, 120.4)
+
+    assert route.steps[0].end_seconds == 120.4
+    assert route.video_duration_seconds == 120.4
+
+
+def test_retiming_shortens_a_step_when_the_file_is_shorter(db_session):
+    route = _one_take(db_session, 30.0).routes[0]
+
+    guides.retime_route(route, 18.5)
+
+    assert route.steps[0].end_seconds == 18.5
+
+
+def test_retiming_puts_the_photo_in_the_middle_of_the_step(db_session):
+    """Hoy sale «marca + 1,5 s»: el instante justo después de pulsar Grabar."""
+    route = _one_take(db_session, 30.0).routes[0]
+
+    guides.retime_route(route, 20.0)
+
+    assert route.steps[0].photo_second == 10.0
+
+
+def test_retiming_adds_up_the_duration_of_the_whole_guide(db_session):
+    guide = _one_take(db_session, 30.0)
+    guides.add_route(db_session, guide, title="Recepción",
+                     marks=[{"title": "Recepción", "category": "reception",
+                             "marked_at_seconds": 0.0}],
+                     video_duration_seconds=30.0)
+
+    guides.retime_route(guide.routes[0], 18.0)
+
+    assert guide.video_duration_seconds == 48.0
+
+
+def test_retiming_chains_the_steps_and_clamps_marks_past_the_end(db_session):
+    guide = create(db_session)  # marks at 0, 12 and 30
+
+    guides.retime_route(guide.routes[0], 20.0)
+
+    steps = guide.routes[0].steps
+    assert [(s.start_seconds, s.end_seconds) for s in steps] == [(0.0, 12.0), (12.0, 20.0), (19.0, 20.0)]
+
+
+def test_a_mark_past_the_end_keeps_a_short_clip_at_the_tail(db_session):
+    """The file is shorter than the phone's clock: the last part was marked after it ended."""
+    guide = create(db_session)  # marks at 0, 12 and 30
+
+    guides.retime_route(guide.routes[0], 12.0)
+
+    last = guide.routes[0].steps[-1]
+    assert (last.start_seconds, last.end_seconds) == (11.0, 12.0)
+    assert last.photo_second == 11.5
+
+
+def test_a_file_shorter_than_the_floor_is_the_whole_step(db_session):
+    route = _one_take(db_session, 30.0).routes[0]
+
+    guides.retime_route(route, 0.4)
+
+    step = route.steps[0]
+    assert (step.start_seconds, step.end_seconds) == (0.0, 0.4)
+
+
+def _mark(title):
+    return {"title": title, "category": "other", "marked_at_seconds": 0.0}
+
+
+def _guide_with_routes(db_session, *titles):
+    """`make_guide` builds a Guide with no routes: the first route comes from `create`."""
+    guide = guides.create(db_session, title=titles[0], venue_name="Centro Trinidad",
+                          marks=[_mark(titles[0])], video_duration_seconds=10)
+    for title in titles[1:]:
+        guides.add_route(db_session, guide, title=title, marks=[_mark(title)],
+                         video_duration_seconds=10)
+    return guide
+
+
+def test_a_route_can_be_inserted_in_a_place_of_its_own(db_session):
+    guide = _guide_with_routes(db_session, "Entrada", "Sala")
+
+    guides.add_route(db_session, guide, title="Recepción", marks=[_mark("Recepción")],
+                     video_duration_seconds=10, position=2)
+
+    assert [r.title for r in sorted(guide.routes, key=lambda r: r.position)] == [
+        "Entrada", "Recepción", "Sala"]
+
+
+def test_inserting_renumbers_the_steps_of_the_whole_guide(db_session):
+    """«paso 3 de 7» tiene que seguir significando algo."""
+    guide = _guide_with_routes(db_session, "Entrada", "Sala")
+    guides.add_route(db_session, guide, title="Recepción", marks=[_mark("Recepción")],
+                     video_duration_seconds=10, position=2)
+    db_session.expire_all()
+
+    assert [(s.position, s.title) for s in sorted(guide.steps, key=lambda s: s.position)] == [
+        (1, "Entrada"), (2, "Recepción"), (3, "Sala")]
+
+
+def test_without_a_position_a_route_still_goes_last(db_session):
+    """Lo que ya existe no cambia de comportamiento."""
+    guide = _guide_with_routes(db_session, "Entrada", "Sala", "Salida")
+
+    assert [(r.position, r.title) for r in guide.routes] == [
+        (1, "Entrada"), (2, "Sala"), (3, "Salida")]
+    assert [s.position for s in guide.steps] == [1, 2, 3]
+
+
+def test_a_position_past_the_end_goes_last(db_session):
+    guide = _guide_with_routes(db_session, "Entrada")
+
+    guides.add_route(db_session, guide, title="Sala", marks=[_mark("Sala")],
+                     video_duration_seconds=10, position=9)
+
+    assert [r.position for r in guide.routes] == [1, 2]
+
+
+def test_inserting_first_pushes_everything_down_and_keeps_durations(db_session):
+    guide = _guide_with_routes(db_session, "Entrada")
+
+    guides.add_route(db_session, guide, title="Antes", marks=[_mark("Antes")],
+                     video_duration_seconds=5, position=1)
+
+    assert [(r.position, r.title) for r in sorted(guide.routes, key=lambda r: r.position)] == [
+        (1, "Antes"), (2, "Entrada")]
+    assert guide.video_duration_seconds == 15
+
+
+def test_the_first_route_is_named_after_the_guide_unless_told_otherwise(db_session):
+    named = guides.create(db_session, title="Guía", venue_name="Centro", marks=[_mark("A")],
+                          video_duration_seconds=10, route_title="Entrada")
+    default = guides.create(db_session, title="Guía", venue_name="Centro", marks=[_mark("A")],
+                            video_duration_seconds=10)
+
+    assert (named.routes[0].title, default.routes[0].title) == ("Entrada", "Guía")
+
+
+def test_steps_are_numbered_walking_the_routes_in_order(db_session):
+    """The rule itself: routes in order and, inside each, its steps in order."""
+    guide = _guide_with_routes(db_session, "Entrada")
+    guides.add_route(db_session, guide, title="Sala", video_duration_seconds=20,
+                     marks=[_mark("Sala A"), {**_mark("Sala B"), "marked_at_seconds": 10.0}])
+
+    guides.add_route(db_session, guide, title="Recepción", video_duration_seconds=20, position=2,
+                     marks=[_mark("Recepción A"), {**_mark("Recepción B"), "marked_at_seconds": 10.0}])
+    db_session.expire_all()
+
+    assert [(s.position, s.title) for s in sorted(guide.steps, key=lambda s: s.position)] == [
+        (1, "Entrada"), (2, "Recepción A"), (3, "Recepción B"), (4, "Sala A"), (5, "Sala B")]
+    assert [(r.position, r.title) for r in sorted(guide.routes, key=lambda r: r.position)] == [
+        (1, "Entrada"), (2, "Recepción"), (3, "Sala")]

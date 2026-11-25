@@ -167,6 +167,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/guides/{guide_id}/routes/{route_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete Route
+         * @description Remove one recording of a guide with its steps and files, closing the gap in the numbering.
+         *
+         *     Same order as deleting a guide: the files first, so a storage failure leaves the route in
+         *     place to try again. The last recording of a published guide stays: deleting it would leave a
+         *     public link, maybe already printed as a QR, pointing at nothing.
+         */
+        delete: operations["delete_route_guides__guide_id__routes__route_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/guides/{guide_id}/video": {
         parameters: {
             query?: never;
@@ -291,6 +315,11 @@ export interface components {
              * @description One per part reached, in order. Must move forward in time and all fall before video_duration_seconds. Each mark becomes a step running to the next.
              */
             marks: components["schemas"]["MarkIn"][];
+            /**
+             * Route Title
+             * @description Name of the first recording, the part it covers: 'Entrada'. Defaults to title.
+             */
+            route_title?: string | null;
             /**
              * Language
              * @default es
@@ -451,6 +480,11 @@ export interface components {
              * @description Second of the video when 'Llegue a: X' was tapped.
              */
             marked_at_seconds: number;
+            /**
+             * Noise Level
+             * @description How the place sounded, said by the person who was there. Kept as a human answer: a level measured later never replaces it.
+             */
+            noise_level?: ("quiet" | "medium" | "noisy") | null;
         };
         /**
          * Pending
@@ -535,6 +569,11 @@ export interface components {
             title: string;
             /** Video Duration Seconds */
             video_duration_seconds: number;
+            /**
+             * Position
+             * @description Place among the guide's routes, 1-based. Omitted: it goes last. The routes from there on move down and the steps are renumbered.
+             */
+            position?: number | null;
             /**
              * Marks
              * @description Same rules as when creating a guide. The steps continue the guide's numbering.
@@ -1010,6 +1049,36 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["GuideOut"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_route_guides__guide_id__routes__route_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                guide_id: string;
+                route_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

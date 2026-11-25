@@ -459,6 +459,53 @@
         }
       }
     },
+    "/guides/{guide_id}/routes/{route_id}": {
+      "delete": {
+        "tags": [
+          "guides"
+        ],
+        "summary": "Delete Route",
+        "description": "Remove one recording of a guide with its steps and files, closing the gap in the numbering.\n\nSame order as deleting a guide: the files first, so a storage failure leaves the route in\nplace to try again. The last recording of a published guide stays: deleting it would leave a\npublic link, maybe already printed as a QR, pointing at nothing.",
+        "operationId": "delete_route_guides__guide_id__routes__route_id__delete",
+        "parameters": [
+          {
+            "name": "guide_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Guide Id"
+            }
+          },
+          {
+            "name": "route_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Route Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/guides/{guide_id}/video": {
       "post": {
         "tags": [
@@ -679,6 +726,20 @@
             "minItems": 1,
             "title": "Marks",
             "description": "One per part reached, in order. Must move forward in time and all fall before video_duration_seconds. Each mark becomes a step running to the next."
+          },
+          "route_title": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 120,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Route Title",
+            "description": "Name of the first recording, the part it covers: 'Entrada'. Defaults to title."
           },
           "language": {
             "type": "string",
@@ -1027,6 +1088,23 @@
             "minimum": 0.0,
             "title": "Marked At Seconds",
             "description": "Second of the video when 'Llegue a: X' was tapped."
+          },
+          "noise_level": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "quiet",
+                  "medium",
+                  "noisy"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Noise Level",
+            "description": "How the place sounded, said by the person who was there. Kept as a human answer: a level measured later never replaces it."
           }
         },
         "type": "object",
@@ -1196,6 +1274,19 @@
             "type": "number",
             "exclusiveMinimum": 0.0,
             "title": "Video Duration Seconds"
+          },
+          "position": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Position",
+            "description": "Place among the guide's routes, 1-based. Omitted: it goes last. The routes from there on move down and the steps are renumbered."
           },
           "marks": {
             "items": {

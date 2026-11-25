@@ -245,3 +245,26 @@ def test_the_catalogue_says_nothing_about_the_state_of_the_work(client, db_sessi
 
     assert set(entry) == {"title", "venue_name", "public_slug", "cover_photo_url",
                           "walking_minutes", "reviewed_at", "language"}
+
+
+def test_the_first_route_can_be_named_after_its_part(client):
+    """Hoy la ruta 1 se llama como la guía, y el visitante vería «Recorrido principal»."""
+    response = client.post("/guides", json={
+        "title": "Recorrido principal", "venue_name": "Centro Trinidad", "route_title": "Entrada",
+        "video_duration_seconds": 20, "marks": [{"title": "Entrada", "category": "entrance",
+                                                 "marked_at_seconds": 0.0}]})
+
+    assert response.json()["routes"][0]["title"] == "Entrada"
+
+
+def test_a_route_can_be_inserted_through_the_api(client):
+    guide = create_guide(client).json()
+    mark = {"title": "Recepción", "category": "reception", "marked_at_seconds": 0.0}
+
+    response = client.post(f"/guides/{guide['id']}/routes", json={
+        "title": "Recepción", "video_duration_seconds": 10, "position": 1, "marks": [mark]})
+
+    assert response.status_code == 201
+    body = response.json()
+    assert [r["title"] for r in sorted(body["routes"], key=lambda r: r["order"])][0] == "Recepción"
+    assert [s["title"] for s in sorted(body["steps"], key=lambda s: s["order"])][0] == "Recepción"

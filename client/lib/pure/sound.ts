@@ -5,6 +5,19 @@
 // fade so the first instant is silence rather than a jolt.
 
 /** The rise takes this long. Long enough to be a rise, short enough not to feel broken. */
+export type Level = "quiet" | "medium" | "noisy";
+
+/**
+ * The noise level to announce before playing a place, or null when nobody said or measured it.
+ *
+ * Null instead of "quiet": the sheet that asks permission to play is the warning about noise, and
+ * calling a place quiet without knowing would be that warning lying.
+ */
+export function levelOf(step: { noise_level?: string | null }): Level | null {
+  const level = step.noise_level;
+  return level === "quiet" || level === "medium" || level === "noisy" ? level : null;
+}
+
 export const FADE_MS = 1500;
 
 /** Where the fade stops. Below 1 on purpose: the place should be audible, not loud. */

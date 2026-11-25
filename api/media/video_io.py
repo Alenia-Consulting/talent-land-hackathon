@@ -20,6 +20,7 @@ from media.errors import ProcessingFailed, ProcessingUnavailable
 
 FPS = 24
 MAX_SHORT_SIDE = 720
+DURATION_TIMEOUT_SECONDS = 120
 
 Size = tuple[int, int]
 
@@ -31,6 +32,30 @@ def ffmpeg_exe() -> str:
         return imageio_ffmpeg.get_ffmpeg_exe()
     except Exception as error:  # the wheel has no binary for this platform
         raise ProcessingUnavailable("ffmpeg no está disponible en este servidor") from error
+
+
+def duration(video: pathlib.Path) -> float:
+    """The real length of the file in seconds, found by decoding all of it.
+
+    The header cannot be trusted: a webm from MediaRecorder usually carries no duration. ffmpeg
+    reports its progress as `time=HH:MM:SS.ss`, and the last one is where the decoding ended.
+    """
+    try:
+        result = subprocess.run(
+            [ffmpeg_exe(), "-nostdin", "-i", str(video), "-f", "null", "-"],
+            capture_output=True, text=True, errors="replace", timeout=DURATION_TIMEOUT_SECONDS,
+        )
+    except subprocess.TimeoutExpired as error:
+        raise ProcessingFailed("medir el vídeo tardó demasiado") from error
+    # A file that only decodes in part would otherwise answer the last time it reached as if it
+    # were the whole length, and the steps would be cut against a wrong end.
+    if result.returncode != 0:
+        raise ProcessingFailed("no se pudo leer el vídeo entero")
+    times = re.findall(r"time=(\d+):(\d{2}):(\d{2}(?:\.\d+)?)", result.stderr)
+    if not times:
+        raise ProcessingFailed("no se pudo leer el vídeo")
+    hours, minutes, seconds = times[-1]
+    return int(hours) * 3600 + int(minutes) * 60 + float(seconds)
 
 
 def target_size(video: pathlib.Path) -> Size:
@@ -49,27 +74,6 @@ def target_size(video: pathlib.Path) -> Size:
     scale = min(1.0, MAX_SHORT_SIDE / min(width, height))
     # Even sizes: H.264 with yuv420p cannot encode odd ones.
     return (round(width * scale) // 2 * 2, round(height * scale) // 2 * 2)
-
-
-def duration(video: pathlib.Path) -> float | None:
-    """How long the file really is, in seconds, or None when ffmpeg cannot tell.
-
-    Decodes the whole video to nowhere and reads the last timestamp, because a phone recording
-    often has no duration in its header. Slow, so only used to explain a failure: the recorder
-    measures its own clock, and when the file turns out shorter the steps run past its end.
-    """
-    try:
-        result = subprocess.run(
-            [ffmpeg_exe(), "-nostdin", "-i", str(video), "-f", "null", "-"],
-            capture_output=True, text=True, timeout=120,
-        )
-    except (OSError, subprocess.TimeoutExpired):
-        return None
-    times = re.findall(r"time=(\d+):(\d+):(\d+(?:\.\d+)?)", result.stderr)
-    if not times:
-        return None
-    hours, minutes, seconds = times[-1]
-    return int(hours) * 3600 + int(minutes) * 60 + float(seconds)
 
 
 def read_frames(

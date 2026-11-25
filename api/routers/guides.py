@@ -18,7 +18,7 @@ from db import guides
 from db.models import Guide, Route
 from db.session import get_session
 from ai import gemini
-from media import pipeline, storage
+from media import pipeline, storage, video_io
 from schemas import (
     GuideCreate,
     GuideOut,
@@ -145,6 +145,7 @@ def create_guide(payload: GuideCreate, session: Session = Depends(get_session)) 
             marks=[mark.model_dump() for mark in payload.marks],
             video_duration_seconds=payload.video_duration_seconds,
             language=payload.language,
+            route_title=payload.route_title,
         )
     except ValueError as error:
         raise HTTPException(status_code=422, detail=str(error)) from error
@@ -239,6 +240,7 @@ def add_route(
             title=payload.title,
             marks=[mark.model_dump() for mark in payload.marks],
             video_duration_seconds=payload.video_duration_seconds,
+            position=payload.position,
         )
     except ValueError as error:
         raise HTTPException(status_code=422, detail=str(error)) from error
@@ -261,6 +263,35 @@ def delete_guide(guide_id: uuid.UUID, session: Session = Depends(get_session)) -
         except storage.StorageError as error:
             raise HTTPException(status_code=502, detail=str(error)) from error
     guides.delete(session, guide)
+    session.commit()
+
+
+@router.delete("/guides/{guide_id}/routes/{route_id}", status_code=204)
+def delete_route(
+    guide_id: uuid.UUID, route_id: uuid.UUID, session: Session = Depends(get_session)
+) -> None:
+    """Remove one recording of a guide with its steps and files, closing the gap in the numbering.
+
+    Same order as deleting a guide: the files first, so a storage failure leaves the route in
+    place to try again. The last recording of a published guide stays: deleting it would leave a
+    public link, maybe already printed as a QR, pointing at nothing.
+    """
+    guide = _load(session, guide_id)
+    route = guides.route_of(guide, route_id)
+    if route is None:
+        raise HTTPException(status_code=404, detail="route not found")
+    if guide.status == "published" and len(guide.routes) == 1:
+        raise HTTPException(
+            status_code=409,
+            detail="No se puede borrar el único recorrido de una guía publicada.",
+        )
+    paths = guides.route_media_paths(route)
+    if paths:
+        try:
+            storage.remove(storage.config_from_env(), paths)
+        except storage.StorageError as error:
+            raise HTTPException(status_code=502, detail=str(error)) from error
+    guides.delete_route(session, guide, route)
     session.commit()
 
 
@@ -314,6 +345,8 @@ def _ingest(session: Session, guide: Guide, route: Route, video: UploadFile) -> 
         _save_upload(video, target)
         _set_processing_status(session, guide, route, "processing")
 
+        # The duration the phone sent is a hint: the file says how long the recording really is.
+        guides.retime_route(route, video_io.duration(target))
         steps = route.steps
         timings = [
             pipeline.StepTiming(
@@ -332,15 +365,17 @@ def _ingest(session: Session, guide: Guide, route: Route, video: UploadFile) -> 
             step = by_position.get(item.position)
             if step is None:
                 continue
-            # Always the id: the slug only exists once published, and the path must not move then.
-            # Positions are unique across the guide's routes, so two routes never share a path.
-            base = f"{guide.id}/paso-{item.position}"
+            # The guide id, not the slug: the slug only exists once published and the path must not
+            # move then. The step id, not its position: positions move when a route is inserted
+            # before it, and a path built on them would be overwritten by whoever takes the number.
+            base = f"{guide.id}/{step.id}"
             step.clip_path = storage.upload(config, f"{base}.mp4", item.clip, "video/mp4")
             step.photo_path = storage.upload(config, f"{base}.jpg", item.photo, "image/jpeg")
             if item.sound is not None:
                 step.sound_path = storage.upload(config, f"{base}.mp3", item.sound, "audio/mpeg")
                 step.sound_available = True
-            if item.noise_level is not None:
+            # Never over what a person said: whoever stood there knows more than a measurement.
+            if item.noise_level is not None and step.noise_level_source != "manual":
                 step.noise_level = item.noise_level
                 step.noise_level_source = "measured"
         _write_texts(by_position, processed, route)

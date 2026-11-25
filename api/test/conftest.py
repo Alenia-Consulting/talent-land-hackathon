@@ -4,6 +4,8 @@ The CI has no PostgreSQL, so the tests run against in-memory SQLite. create_all(
 throwaway schema for a single test; the real schema is only ever changed by Alembic migrations.
 """
 
+import pathlib
+import subprocess
 import uuid
 
 import pytest
@@ -13,6 +15,18 @@ from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
 
 from db.models import Base, Guide, Step
+from media import video_io
+
+
+def encode_seconds(tmp_path: pathlib.Path, seconds: float) -> pathlib.Path:
+    """A small mp4 of a known length, encoded with the same ffmpeg the API uses."""
+    video = tmp_path / "recording.mp4"
+    subprocess.run(
+        [video_io.ffmpeg_exe(), "-y", "-loglevel", "error", "-f", "lavfi",
+         "-i", f"testsrc=size=160x90:rate=10:duration={seconds}", "-pix_fmt", "yuv420p", str(video)],
+        check=True,
+    )
+    return video
 
 
 @pytest.fixture
@@ -72,3 +86,26 @@ def client(db_session):
     with TestClient(main.app) as test_client:
         yield test_client
     main.app.dependency_overrides.clear()
+
+
+# Longer than any step a test writes, so retiming leaves the test's own timings alone.
+UNMEASURABLE_UPLOAD_SECONDS = 1000.0
+
+
+@pytest.fixture(autouse=True)
+def measurable_upload(monkeypatch):
+    """Upload tests send placeholder bytes, which no decoder can measure.
+
+    A real video is measured for real; bytes that are not a video get a stand-in length.
+    """
+    from media.errors import ProcessingFailed
+
+    real = video_io.duration
+
+    def duration(video):
+        try:
+            return real(video)
+        except ProcessingFailed:
+            return UNMEASURABLE_UPLOAD_SECONDS
+
+    monkeypatch.setattr(video_io, "duration", duration)
