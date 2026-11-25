@@ -5,6 +5,7 @@ import pathlib
 import cv2
 import pytest
 
+from conftest import encode_seconds
 from media import faces, pipeline, video_io
 from media_fixtures import make_video
 
@@ -75,21 +76,37 @@ def test_something_that_is_not_a_video_fails_cleanly(tmp_path):
         pipeline.process(garbage, STEPS)
 
 
-def test_a_step_beyond_the_end_of_the_video_fails_instead_of_returning_nothing(tmp_path):
-    video = make_video(tmp_path / "in.mp4", seconds=2)
-    late = [pipeline.StepTiming(position=1, start_seconds=30.0, end_seconds=40.0, photo_second=31.0)]
-
-    with pytest.raises(pipeline.ProcessingFailed):
-        pipeline.process(video, late)
-
-
-def test_a_failure_returns_nothing_at_all(tmp_path):
-    """Step 1 is fine, step 2 is past the end: the caller must not get step 1 alone."""
+def test_a_rescued_step_keeps_its_neighbours(tmp_path):
+    """Step 2 is past the end: it is rescued and step 1 is untouched, both come back."""
     video = make_video(tmp_path / "in.mp4", seconds=2)
     steps = [
         pipeline.StepTiming(position=1, start_seconds=0.0, end_seconds=1.0, photo_second=0.5),
         pipeline.StepTiming(position=2, start_seconds=30.0, end_seconds=31.0, photo_second=30.5),
     ]
 
+    assert [item.position for item in pipeline.process(video, steps)] == [1, 2]
+
+
+def test_a_step_past_the_end_uses_the_last_frame_instead_of_failing(tmp_path):
+    """Las guías ya grabadas tienen marcas posteriores al final real del fichero."""
+    video = encode_seconds(tmp_path, 2.0)
+    steps = [pipeline.StepTiming(position=1, start_seconds=5.0, end_seconds=6.0, photo_second=5.5)]
+
+    processed = pipeline.process(video, steps)
+
+    assert len(processed[0].photo) > 0
+
+
+def test_a_file_with_no_frames_at_all_is_still_a_failure(tmp_path):
+    empty = tmp_path / "vacio.mp4"
+    empty.write_bytes(b"")
     with pytest.raises(pipeline.ProcessingFailed):
-        pipeline.process(video, steps)
+        pipeline.process(empty, [pipeline.StepTiming(1, 0.0, 1.0, 0.5)])
+
+
+def test_a_rescued_step_gets_a_clip_with_frames_in_it(tmp_path):
+    """Un mp4 de cero fotogramas es una tarjeta rota en el reproductor."""
+    video = encode_seconds(tmp_path, 2.0)
+    steps = [pipeline.StepTiming(position=1, start_seconds=5.0, end_seconds=6.0, photo_second=5.5)]
+
+    assert len(frames_of(pipeline.process(video, steps)[0].clip, tmp_path)) > 0

@@ -66,7 +66,7 @@ class ProcessedStep:
 def process(video: pathlib.Path, steps: Sequence[StepTiming]) -> list[ProcessedStep]:
     """Cut and blur one recording.
 
-    Raises ProcessingFailed when the recording cannot be read or a step has no image, and
+    Raises ProcessingFailed when the recording cannot be read (a step outside it is rescued), and
     ProcessingUnavailable when ffmpeg or the detector is missing.
     """
     with _processing, tempfile.TemporaryDirectory() as workdir:
@@ -87,13 +87,21 @@ def _process_step(video: pathlib.Path, size: video_io.Size, step: StepTiming, wo
     photo_frame = None
 
     with video_io.clip_writer(clip_path, size) as write:
-        frames = video_io.read_frames(video, size, step.start_seconds, step.end_seconds - step.start_seconds)
-        for index, frame in enumerate(frames):
-            blur(frame)
-            write(frame)
-            # The frame at photo_second, or the last one when the clip ends before it.
-            if photo_frame is None or index <= photo_index:
-                photo_frame = frame
+        # The range can lie past the end of the file (guides recorded before the duration was
+        # measured): the step keeps the last second of the recording rather than losing the walk.
+        last_second = max(0.0, video_io.duration(video) - 1.0)
+        for start, length, wanted in (
+            (step.start_seconds, step.end_seconds - step.start_seconds, photo_index),
+            (last_second, 1.0, None),
+        ):
+            for index, frame in enumerate(video_io.read_frames(video, size, start, length)):
+                blur(frame)
+                write(frame)
+                # The frame at photo_second, or the last one when the clip ends before it.
+                if photo_frame is None or wanted is None or index <= wanted:
+                    photo_frame = frame
+            if photo_frame is not None:
+                break
 
     if photo_frame is None:
         raise ProcessingFailed(f"el paso {step.position} no tiene imagen en el vídeo")

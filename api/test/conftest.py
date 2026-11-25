@@ -4,6 +4,8 @@ The CI has no PostgreSQL, so the tests run against in-memory SQLite. create_all(
 throwaway schema for a single test; the real schema is only ever changed by Alembic migrations.
 """
 
+import pathlib
+import subprocess
 import uuid
 
 import pytest
@@ -13,6 +15,18 @@ from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
 
 from db.models import Base, Guide, Step
+from media import video_io
+
+
+def encode_seconds(tmp_path: pathlib.Path, seconds: float) -> pathlib.Path:
+    """A small mp4 of a known length, encoded with the same ffmpeg the API uses."""
+    video = tmp_path / "recording.mp4"
+    subprocess.run(
+        [video_io.ffmpeg_exe(), "-y", "-loglevel", "error", "-f", "lavfi",
+         "-i", f"testsrc=size=160x90:rate=10:duration={seconds}", "-pix_fmt", "yuv420p", str(video)],
+        check=True,
+    )
+    return video
 
 
 @pytest.fixture
@@ -84,7 +98,6 @@ def measurable_upload(monkeypatch):
 
     A real video is measured for real; bytes that are not a video get a stand-in length.
     """
-    from media import video_io
     from media.errors import ProcessingFailed
 
     real = video_io.duration
