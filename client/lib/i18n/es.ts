@@ -20,6 +20,15 @@ export const es = {
     record: "Grabar un recorrido",
     recordLead: "2 minutos con el móvil. Te guiamos.",
   },
+  // La parte del centro: quien graba y quien revisa. No la ve nadie que venga de visita.
+  centro: {
+    title: "Tu centro",
+    lead: "Graba un recorrido nuevo o revisa los que ya tienes.",
+    guidesLead: "Revisa, corrige y publica.",
+    check: "Comprobar la conexión",
+    checking: "Comprobando…",
+    checkNote: "Comprobación técnica, para quien mantiene la app.",
+  },
   intro: {
     step: "Paso 1 de 3",
     title: "Antes de grabar",

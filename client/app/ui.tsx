@@ -11,7 +11,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 
 import { es } from "../lib/i18n/es.ts";
-import { ChevronLeftIcon } from "./icons.tsx";
+import { AntesalaMark, ChevronLeftIcon, ChevronRightIcon } from "./icons.tsx";
 
 export function Card({ children, className = "" }: { children: ReactNode; className?: string }) {
   return <div className={`rounded-3xl bg-tarjeta p-5 ${className}`}>{children}</div>;
@@ -57,6 +57,54 @@ export function TopBar({ children }: { children: ReactNode }) {
 }
 
 /**
+ * A way in: an icon, what it is, what it does, and an arrow.
+ *
+ * Shared by the door and the venue's side so that a choice looks the same wherever it is offered.
+ * `filled` is the one this screen expects you to want; the other keeps the card surface, so
+ * neither reads as the afterthought.
+ */
+export function Door({
+  href,
+  icon,
+  title,
+  lead,
+  filled = false,
+}: {
+  href: string;
+  icon: ReactNode;
+  title: string;
+  lead: string;
+  filled?: boolean;
+}) {
+  return (
+    <Link
+      href={href}
+      className={`flex items-center gap-4 rounded-3xl p-5 ${
+        filled ? "bg-pino text-sobre-pino" : "border-2 border-pino/20 bg-tarjeta text-tinta"
+      }`}
+    >
+      <span
+        aria-hidden="true"
+        className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl ${
+          filled ? "bg-sobre-pino/15" : "bg-salvia text-pino"
+        }`}
+      >
+        {icon}
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block text-2xl font-extrabold">{title}</span>
+        <span className={`mt-1 block text-lg ${filled ? "text-sobre-pino/85" : "text-tinta/70"}`}>
+          {lead}
+        </span>
+      </span>
+      <span aria-hidden="true" className={filled ? "text-sobre-pino/70" : "text-pino"}>
+        <ChevronRightIcon size={26} />
+      </span>
+    </Link>
+  );
+}
+
+/**
  * The way out of a screen, as a control on the page and not the browser's back button.
  *
  * Every screen below the door carries one, in the same corner. Somebody who arrived by QR has no
@@ -86,6 +134,20 @@ export function BackLink({
       <ChevronLeftIcon size={24} />
       {!compact && label}
     </Link>
+  );
+}
+
+/** The mark and the name, the same size and the same corner on every screen that carries them. */
+export function Wordmark({ size = 36 }: { size?: number }) {
+  return (
+    <>
+      <span className="text-pino">
+        <AntesalaMark size={size} />
+      </span>
+      {/* The name grows with the mark: a 44px tile beside 20px type reads as a logo that lost
+          its caption. */}
+      <span className={`font-extrabold ${size >= 44 ? "text-2xl" : "text-xl"}`}>antesala</span>
+    </>
   );
 }
 

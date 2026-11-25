@@ -1,5 +1,3 @@
-import Link from "next/link";
-
 // The door. Two ways in, and the question is what you came to do — not who you are.
 //
 // Asking somebody to declare a disability to get in would go against the rule this app already
@@ -14,60 +12,16 @@ import Link from "next/link";
 // knowing nothing about the product. Nothing here moves, fades or waits.
 
 import { es } from "../lib/i18n/es.ts";
-import { AntesalaMark, ChevronRightIcon, SearchIcon, VideoIcon } from "./icons.tsx";
+import { SearchIcon, VideoIcon } from "./icons.tsx";
+import { Door, Wordmark } from "./ui.tsx";
 
 const t = es.home;
-
-/** One of the two ways in. Same shape both times, so neither reads as the afterthought. */
-function Door({
-  href,
-  icon,
-  title,
-  lead,
-  filled,
-}: {
-  href: string;
-  icon: React.ReactNode;
-  title: string;
-  lead: string;
-  filled?: boolean;
-}) {
-  return (
-    <Link
-      href={href}
-      className={`flex items-center gap-4 rounded-3xl p-5 ${
-        filled ? "bg-pino text-sobre-pino" : "border-2 border-pino/20 bg-tarjeta text-tinta"
-      }`}
-    >
-      <span
-        aria-hidden="true"
-        className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl ${
-          filled ? "bg-sobre-pino/15" : "bg-salvia text-pino"
-        }`}
-      >
-        {icon}
-      </span>
-      <span className="min-w-0 flex-1">
-        <span className="block text-2xl font-extrabold">{title}</span>
-        <span className={`mt-1 block text-lg ${filled ? "text-sobre-pino/85" : "text-tinta/70"}`}>
-          {lead}
-        </span>
-      </span>
-      <span aria-hidden="true" className={filled ? "text-sobre-pino/70" : "text-pino"}>
-        <ChevronRightIcon size={26} />
-      </span>
-    </Link>
-  );
-}
 
 export default function Home() {
   return (
     <main className="mx-auto max-w-2xl px-4 py-8">
       <header className="flex items-center gap-3">
-        <span className="text-pino">
-          <AntesalaMark size={44} />
-        </span>
-        <span className="text-2xl font-extrabold">antesala</span>
+        <Wordmark size={44} />
       </header>
 
       {/* The promise is the heading, not the brand name: somebody who lands here has never
