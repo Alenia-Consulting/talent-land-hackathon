@@ -15,6 +15,45 @@ export function Card({ children, className = "" }: { children: ReactNode; classN
   return <div className={`rounded-3xl bg-tarjeta p-5 ${className}`}>{children}</div>;
 }
 
+/**
+ * Where a screen's action lives: the bottom edge, always, however long the page is.
+ *
+ * The design rule is that the big buttons sit in the same place on every screen. On a page that
+ * scrolls that has to mean the bottom of the WINDOW, not the bottom of the document, or the way
+ * out of the screen is something you have to go looking for. `sticky` and not `fixed` so a short
+ * page keeps it in the flow and nothing floats over content that already fits.
+ *
+ * `-mx-4 px-4` because every page of this app is padded by 4: the bar bleeds to both edges and
+ * puts its own padding back, so the line above it spans the full width.
+ */
+export function ActionBar({
+  note,
+  children,
+  className = "",
+}: {
+  note?: ReactNode;
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <div
+      className={`sticky bottom-0 z-30 -mx-4 mt-8 border-t border-tinta/10 bg-niebla px-4 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))] ${className}`}
+    >
+      {note && <div className="mb-3 text-base text-tinta/70">{note}</div>}
+      <div className="flex flex-wrap items-center gap-3">{children}</div>
+    </div>
+  );
+}
+
+/** The counterpart at the top: where you are and the way back, kept on screen while you scroll. */
+export function TopBar({ children }: { children: ReactNode }) {
+  return (
+    <div className="sticky top-0 z-30 -mx-4 mb-5 border-b border-tinta/10 bg-niebla px-4 py-3">
+      {children}
+    </div>
+  );
+}
+
 /** Small uppercase section label, the way the design separates blocks. */
 export function SectionLabel({ children, right }: { children: ReactNode; right?: ReactNode }) {
   return (

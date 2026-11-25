@@ -4,25 +4,25 @@
 //
 // The id travels in the query string because the client is exported statically, so a /panel/[id]
 // route could not be pre-rendered for ids that do not exist at build time.
+//
+// The screen is three fixed parts: where you are (top), what is left to do (middle) and the one
+// thing to press next (bottom). The top and the bottom stay put while the middle scrolls, so
+// approving a guide never means scrolling to the end to finish the last step and then back to
+// the top to find the button. The bar at the bottom always carries exactly one action, and which
+// one it is depends on the state of the review: go to what is missing, publish, or share.
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { Suspense, useCallback, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 
-import {
-  ApiError,
-  type Guide,
-  patchStep,
-  publishGuide,
-  readGuide,
-  type StepPatch,
-} from "../../../lib/guides.ts";
 import { es } from "../../../lib/i18n/es.ts";
-import { countMissing } from "../../../lib/pure/review.ts";
-import { AlertIcon, CheckIcon, QrIcon } from "../../icons.tsx";
-import { Button, Card, StatusChip } from "../../ui.tsx";
+import { draftOf, missingInDraft, reviewStateOf } from "../../../lib/pure/draft.ts";
+import { ProgressSegments } from "../../controls.tsx";
+import { AlertIcon, CheckIcon, ChevronLeftIcon, QrIcon } from "../../icons.tsx";
+import { ActionBar, Button, Card, StatusChip, TopBar } from "../../ui.tsx";
 import { ShareSheet } from "./share.tsx";
-import { StepForm } from "./step-form.tsx";
+import { anchorOf, focusBlank, SaveStatus, StepForm } from "./step-form.tsx";
+import { useReview } from "./useReview.ts";
 
 const t = es.panel.detail;
 
@@ -35,46 +35,64 @@ function reviewedOn(iso: string | null | undefined): string | null {
     : date.toLocaleDateString("es-ES", { day: "numeric", month: "short", year: "numeric" });
 }
 
+/** What this panel promises about the media, said next to the button that publishes it. */
+function Guarantees({ hasMedia }: { hasMedia: boolean }) {
+  return (
+    <Card className="mt-4 bg-salvia">
+      {/* Only claimed when there is media to have blurred. Saying "faces blurred" about a guide
+          with no clips would be the panel vouching for work nobody did. */}
+      {hasMedia && (
+        <ul className="mb-3 grid gap-2">
+          {[t.blurred, t.filtered].map((line) => (
+            <li key={line} className="flex items-center gap-3 text-pino">
+              <CheckIcon size={22} />
+              <span className="text-tinta">{line}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+      <p className="text-base text-pino">{t.nothingWithoutYou}</p>
+    </Card>
+  );
+}
+
 function GuideDetail() {
   const id = useSearchParams().get("id");
-  const [guide, setGuide] = useState<Guide | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-  // Opens by itself the moment a guide is published: the link and the QR are what the venue came
-  // for, and asking them to find a button after approving is a step with no purpose.
-  const [sharing, setSharing] = useState(false);
+  const review = useReview(id);
+  const { guide, drafts, states, error } = review;
 
-  const fail = useCallback((cause: unknown) => {
-    setError(cause instanceof ApiError ? cause.message : String(cause));
+  // Which step is open. One at a time: a review is a list of things already done plus the one
+  // being done, and showing eight open forms is what made this screen a scroll.
+  const [open, setOpen] = useState<string | null>(null);
+  const [sharing, setSharing] = useState(false);
+  const started = useRef(false);
+  const wantsToShare = useRef(false);
+
+  const goTo = useCallback((stepId: string) => {
+    setOpen(stepId);
+    // After the step has been laid out open, or there is nothing to scroll to yet.
+    requestAnimationFrame(() => {
+      document.getElementById(anchorOf(stepId))?.scrollIntoView({ block: "start" });
+    });
   }, []);
 
+  const state = guide ? reviewStateOf(guide.steps, drafts) : null;
+
+  // Opens on the first thing left to do, which is where the person was going anyway.
   useEffect(() => {
-    if (!id) return;
-    readGuide(id).then(setGuide).catch(fail);
-  }, [id, fail]);
+    if (!guide || started.current) return;
+    started.current = true;
+    setOpen(reviewStateOf(guide.steps, {}).next?.id ?? null);
+  }, [guide]);
 
-  const save = (stepId: string, changes: StepPatch) => {
-    if (!id) return;
-    setBusy(true);
-    setError(null);
-    patchStep(id, stepId, changes)
-      .then(setGuide)
-      .catch(fail)
-      .finally(() => setBusy(false));
-  };
-
-  const publish = () => {
-    if (!id) return;
-    setBusy(true);
-    setError(null);
-    publishGuide(id)
-      .then((published) => {
-        setGuide(published);
-        if (published.public_slug) setSharing(true);
-      })
-      .catch(fail)
-      .finally(() => setBusy(false));
-  };
+  // The link and the QR are what the venue came for: asking them to find a button after
+  // approving is a step with no purpose.
+  useEffect(() => {
+    if (wantsToShare.current && guide?.status === "published" && guide.public_slug) {
+      wantsToShare.current = false;
+      setSharing(true);
+    }
+  }, [guide?.status, guide?.public_slug]);
 
   if (!id) return <p role="alert">{es.publica.missingSlug}</p>;
   if (error && !guide)
@@ -83,137 +101,165 @@ function GuideDetail() {
         {error}
       </p>
     );
-  if (!guide) return <p className="text-tinta/70">{es.panel.loading}</p>;
+  if (!guide || !state) return <p className="py-8 text-tinta/70">{es.panel.loading}</p>;
 
-  const pending = guide.pending;
-  // Counted here rather than taken from pending.missing_data, which counts STEPS that have
-  // something missing. The banner names fields, so it has to count fields.
-  const missingCount = countMissing(guide.steps);
-  const ready = pending
-    ? pending.missing_data === 0 && pending.steps_reviewed === pending.steps_total
-    : false;
+  const published = guide.status === "published";
+  const reviewedDate = reviewedOn(guide.reviewed_at);
+  const next = state.next;
+
+  // The step being worked on, and what it still needs. The bar at the bottom carries its action,
+  // so finishing a step never means scrolling to the end of its form to find a button.
+  const openStep = guide.steps.find((step) => step.id === open) ?? null;
+  const openMissing = openStep
+    ? missingInDraft(openStep, drafts[openStep.id] ?? draftOf(openStep))
+    : [];
+  const openPending =
+    openStep && !(openStep.reviewed && openMissing.length === 0) ? openStep : null;
+
+  /** Marking a step read opens the next one that still needs somebody. */
+  const markReviewed = (stepId: string) => {
+    review.markReviewed(stepId, true);
+    // The answer has not come back yet, so this step is excluded by hand rather than read.
+    const following = guide.steps.find((step) => {
+      const draft = drafts[step.id] ?? draftOf(step);
+      return step.id !== stepId && !(step.reviewed && missingInDraft(step, draft).length === 0);
+    });
+    if (following) goTo(following.id);
+    else setOpen(null);
+  };
+
+  /** What the bar says above its button: where the review is, in one line. */
+  const note = (): string => {
+    if (published) return reviewedDate ? t.publishedOn(reviewedDate) : t.publishedNoDate;
+    if (state.ready) return t.ready;
+    const unreviewed = state.total - state.reviewed;
+    return [
+      unreviewed > 0 ? t.stepsLeft(unreviewed) : null,
+      state.missing > 0 ? t.blanksLeft(state.missing) : null,
+    ]
+      .filter(Boolean)
+      .join(" · ");
+  };
 
   return (
     <>
-      <div className="flex flex-wrap items-center gap-3">
-        <h1 className="text-4xl font-extrabold">{guide.title}</h1>
-        <StatusChip status={guide.status} />
-      </div>
-      <p className="mt-1 text-tinta/70">{guide.venue_name}</p>
-
-      {/* Why the draft has holes, said before the person starts filling them in. */}
-      {missingCount > 0 && (
-        <p className="mt-4 flex items-start gap-3 rounded-2xl bg-ambar/35 p-4 text-sobre-ambar">
-          <AlertIcon size={26} />
-          <span>{t.blanks(missingCount)}</span>
-        </p>
-      )}
-
-      {pending && (
-        <Card className="mt-4">
-          <h2 className="text-2xl font-extrabold">{t.beforePublish}</h2>
-          <span
-            className="mt-3 block h-2 w-full overflow-hidden rounded-full bg-salvia"
-            role="progressbar"
-            aria-valuemin={0}
-            aria-valuemax={pending.steps_total}
-            aria-valuenow={pending.steps_reviewed}
+      <TopBar>
+        <div className="flex items-center gap-3">
+          <Link
+            href="/panel"
+            aria-label={t.back}
+            className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-[18px] bg-tarjeta text-tinta"
           >
-            <span
-              className="block h-full rounded-full bg-pino"
-              style={{
-                width: `${pending.steps_total > 0 ? (pending.steps_reviewed / pending.steps_total) * 100 : 0}%`,
-              }}
-            />
+            <ChevronLeftIcon size={24} />
+          </Link>
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-xl font-extrabold">{guide.title}</span>
+            <span className="block truncate text-base text-tinta/60">{guide.venue_name}</span>
           </span>
-          <p className="mt-2 text-tinta/70">
-            {ready ? t.ready : t.reviewedCount(pending.steps_reviewed, pending.steps_total)}
+          <StatusChip status={guide.status} />
+        </div>
+        <div className="mt-3">
+          <ProgressSegments total={state.total} current={state.reviewed} />
+          <p className="mt-2 text-base text-tinta/60">
+            {/* "Ya se puede publicar" is an invitation, so it stops once it has been accepted. */}
+            {state.ready && !published
+              ? t.ready
+              : t.reviewedCount(state.reviewed, state.total)}
           </p>
+        </div>
+      </TopBar>
 
-          <ul className="mt-4 grid gap-2">
-            {/* Only claimed when there is media to have blurred. Saying "faces blurred" about a
-                guide with no clips would be the panel vouching for work nobody did. */}
-            {guide.steps.some((step) => step.clip_url) && (
-              <>
-                <li className="flex items-center gap-3 text-pino">
-                  <CheckIcon size={22} />
-                  <span className="text-tinta">{t.blurred}</span>
-                </li>
-                <li className="flex items-center gap-3 text-pino">
-                  <CheckIcon size={22} />
-                  <span className="text-tinta">{t.filtered}</span>
-                </li>
-              </>
-            )}
-            {missingCount > 0 && (
-              <li className="flex items-center gap-3 text-sobre-ambar">
-                <AlertIcon size={22} />
-                <span className="text-tinta">{t.toComplete(missingCount)}</span>
-              </li>
-            )}
-          </ul>
-
-          {guide.status !== "published" && (
-            <p className="mt-5">
-              <Button disabled={busy || !ready} onClick={publish}>
-                {busy ? t.publishing : t.publish}
-              </Button>
-            </p>
-          )}
-          <p className="mt-4 rounded-2xl bg-salvia p-4 text-base text-pino">
-            {t.nothingWithoutYou}
+      <div className="flex-1">
+        {/* Why the draft has holes, said before the person starts filling them in. */}
+        {state.missing > 0 && (
+          <p className="mb-4 flex items-start gap-3 rounded-2xl bg-ambar/35 px-4 py-3 text-base text-sobre-ambar">
+            <AlertIcon size={22} />
+            <span>{t.blanks(state.missing)}</span>
           </p>
-        </Card>
+        )}
+
+        {error && (
+          <p role="alert" className="mb-4 rounded-2xl bg-coral/15 p-4 text-sobre-coral">
+            {error}
+          </p>
+        )}
+
+        <ol className="grid gap-3">
+          {guide.steps.map((step) => (
+            <StepForm
+              key={step.id}
+              step={step}
+              draft={drafts[step.id] ?? draftOf(step)}
+              open={open === step.id}
+              onOpen={() => goTo(step.id)}
+              onEdit={(patch) => review.edit(step.id, patch)}
+              onSave={() => review.save(step.id)}
+            />
+          ))}
+        </ol>
+
+        <Guarantees hasMedia={guide.steps.some((step) => step.clip_url)} />
+      </div>
+
+      <ActionBar
+        note={
+          <span className="flex flex-wrap items-center justify-between gap-2">
+            <span>{note()}</span>
+            {openStep && (
+              <SaveStatus
+                state={states[openStep.id] ?? "clean"}
+                onRetry={() => review.save(openStep.id)}
+              />
+            )}
+          </span>
+        }
+      >
+        {published ? (
+          <Button icon={<QrIcon size={22} />} onClick={() => setSharing(true)}>
+            {es.compartir.open}
+          </Button>
+        ) : state.ready ? (
+          <Button
+            disabled={review.publishing}
+            onClick={() => {
+              wantsToShare.current = true;
+              review.publish();
+            }}
+          >
+            {review.publishing ? t.publishing : t.publish}
+          </Button>
+        ) : openPending ? (
+          <Button
+            onClick={() =>
+              openMissing.length > 0
+                ? focusBlank(openPending.id, openMissing[0])
+                : markReviewed(openPending.id)
+            }
+          >
+            {openMissing.length > 0 ? t.completeFirst : t.markReviewed}
+          </Button>
+        ) : (
+          next && <Button onClick={() => goTo(next.id)}>{t.goToStep(next.order)}</Button>
+        )}
+      </ActionBar>
+
+      {guide.public_slug && (
+        <ShareSheet
+          open={sharing}
+          onClose={() => setSharing(false)}
+          venue={guide.venue_name}
+          slug={guide.public_slug}
+          reviewed={reviewedDate}
+        />
       )}
-
-      {error && (
-        <p role="alert" className="mt-4 rounded-2xl bg-coral/15 p-4 text-sobre-coral">
-          {error}
-        </p>
-      )}
-
-      {guide.status === "published" && guide.public_slug && (
-        <>
-          <Card className="mt-4 flex flex-wrap items-center justify-between gap-4 bg-salvia">
-            <p className="font-bold text-pino">{t.published}</p>
-            <Button icon={<QrIcon size={22} />} onClick={() => setSharing(true)}>
-              {es.compartir.open}
-            </Button>
-          </Card>
-          <ShareSheet
-            open={sharing}
-            onClose={() => setSharing(false)}
-            venue={guide.venue_name}
-            slug={guide.public_slug}
-            reviewed={reviewedOn(guide.reviewed_at)}
-          />
-        </>
-      )}
-
-      <ol className="mt-6 grid gap-4">
-        {guide.steps.map((step) => (
-          <StepForm
-            key={step.id}
-            step={step}
-            saving={busy}
-            onSave={(changes) => save(step.id, changes)}
-          />
-        ))}
-      </ol>
-
     </>
   );
 }
 
 export default function GuideDetailPage() {
   return (
-    <main className="mx-auto max-w-3xl px-4 py-8">
-      <p className="mb-6">
-        <Link href="/panel" className="font-bold text-pino underline">
-          {t.back}
-        </Link>
-      </p>
-      <Suspense fallback={<p className="text-tinta/70">{es.panel.loading}</p>}>
+    <main className="mx-auto flex min-h-dvh max-w-3xl flex-col px-4">
+      <Suspense fallback={<p className="py-8 text-tinta/70">{es.panel.loading}</p>}>
         <GuideDetail />
       </Suspense>
     </main>

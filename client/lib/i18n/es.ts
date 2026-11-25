@@ -199,9 +199,23 @@ export const es = {
       missing: (campo: string) => `Falta: ${campo}`,
       // What easy read actually asks for, next to the box where it is written.
       easyReadHints: ["Frases cortas", "Una idea por frase", "Segunda persona"],
-      save: "Guardar",
-      saveAndReview: "Guardar y revisar",
-      saving: "Guardando…",
+      // El panel se guarda solo, así que no hay botón de guardar: hay un estado que decir.
+      autosave: {
+        pending: "Sin guardar",
+        saving: "Guardando…",
+        saved: "Guardado",
+        error: "No se pudo guardar",
+      },
+      retry: "Reintentar",
+      // La única decisión que queda en cada paso. Mientras falte algo, el botón lleva al hueco
+      // en vez de quedarse apagado sin explicar por qué.
+      markReviewed: "Marcar revisado",
+      completeFirst: "Completar lo que falta",
+      stepsLeft: (n: number) => plural(n, "paso por revisar", "pasos por revisar"),
+      blanksLeft: (n: number) => plural(n, "dato en blanco", "datos en blanco"),
+      goToStep: (n: number) => `Ir al paso ${n}`,
+      publishedOn: (fecha: string) => `Publicada · revisada el ${fecha}`,
+      publishedNoDate: "Publicada",
       seconds: (from: number, to: number) => `Del segundo ${from} al ${to}`,
     },
   },
@@ -231,6 +245,7 @@ export const es = {
     readAloudHint: "También funciona con el lector de pantalla",
     start: "Empezar paso a paso",
     seeAll: "Ver recorrido completo",
+    back: "Volver",
     dimMode: "Modo tenue",
     player: {
       position: (n: number, total: number) => `Paso ${n} de ${total}`,
