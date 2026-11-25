@@ -183,7 +183,8 @@ export function ReviewScreen({
  */
 export function SendingScreen({ progress }: { progress: number }) {
   const percent = Math.round(progress * 100);
-  const reached = Math.round((percent / 100) * es.proceso.stages.length);
+  // Rounded down, so the last stage is ticked only at 100 %, when the server has answered.
+  const reached = Math.floor((percent / 100) * es.proceso.stages.length);
 
   return (
     <Message title={es.proceso.title} step={{ label: es.proceso.step, current: 3 }}>

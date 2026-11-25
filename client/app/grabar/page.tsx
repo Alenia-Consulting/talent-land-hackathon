@@ -8,6 +8,7 @@ import { addRoute, ApiError, createGuide, type Mark, readGuide } from "../../lib
 import { es } from "../../lib/i18n/es.ts";
 import type { AlertType } from "../../lib/pure/alerts.ts";
 import { markAt, PAUSE_MS, whyNotSendable } from "../../lib/pure/marks.ts";
+import { DONE_HOLD_MS } from "../../lib/pure/progress.ts";
 import { downloadGuide, type GuideInput, uploadVideo, VideoUploadError } from "../../lib/upload.ts";
 import { useAlertLog } from "../../lib/useAlertLog.ts";
 import { useCamera } from "../../lib/useCamera.ts";
@@ -15,6 +16,7 @@ import { useFrameSampler } from "../../lib/useFrameSampler.ts";
 import { useLightMonitor } from "../../lib/useLightMonitor.ts";
 import { useMotionMonitor } from "../../lib/useMotionMonitor.ts";
 import { useRecorder } from "../../lib/useRecorder.ts";
+import { useSendingProgress } from "../../lib/useSendingProgress.ts";
 import {
   CameraPreview,
   CoachCard,
@@ -59,13 +61,13 @@ export default function GrabarPage() {
   const [target, setTarget] = useState<{ id: string; venue: string } | null>(null);
   const [routeId, setRouteId] = useState<string | null>(null);
   const [videoSent, setVideoSent] = useState(false);
-  const [progress, setProgress] = useState(0);
   const [error, setError] = useState<{ source: ErrorSource; message: string } | null>(null);
   const t0 = useRef(0);
 
   const camera = useCamera();
   const recorder = useRecorder();
   const alertLog = useAlertLog();
+  const sending = useSendingProgress(recorder.result?.durationSec ?? 0);
 
   // The only two dark screens of the recorder: the ones with the camera behind them.
   const cameraPhase = phase === "listo" || phase === "grabando";
@@ -192,7 +194,7 @@ export default function GrabarPage() {
     const input = guide();
     if (!plan || !input || markProblem) return;
 
-    setProgress(0);
+    sending.reset();
     setPhase("enviando");
     try {
       // A retry after a failed upload reuses the guide: creating it again would leave a duplicate.
@@ -220,8 +222,12 @@ export default function GrabarPage() {
         setGuideId(id);
       }
       try {
-        await uploadVideo(id, input, setProgress, undefined, route ?? undefined);
+        // Resolves on the 200, which comes after the server has processed the video, not after
+        // the last byte: only then does the bar reach 100 %, and it stays there a moment.
+        await uploadVideo(id, input, sending.onUpload, undefined, route ?? undefined);
+        sending.finish();
         setVideoSent(true);
+        await new Promise((done) => setTimeout(done, DONE_HOLD_MS));
       } catch (cause) {
         // 503: that deployment cannot process video. The guide is saved, the video stays on the
         // device, and the done screen offers the download instead of claiming it was sent.
@@ -262,7 +268,7 @@ export default function GrabarPage() {
         problem={markProblem}
       />
     ),
-    enviando: <SendingScreen progress={progress} />,
+    enviando: <SendingScreen progress={sending.progress} />,
     hecho: <DoneScreen videoSent={videoSent} />,
     error: <ErrorScreen message={error?.message ?? es.error.camera.unknown} />,
   }[phase as Exclude<Phase, "listo" | "grabando">];
