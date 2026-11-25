@@ -13,6 +13,7 @@ import { useEffect, useRef, useState } from "react";
 import type { Step } from "../../lib/guides.ts";
 import { soundUrlOf } from "../../lib/guides.ts";
 import { es } from "../../lib/i18n/es.ts";
+import { pauseSecond } from "../../lib/pure/points.ts";
 import { useAmbience } from "../../lib/useAmbience.ts";
 import { useReducedMotion } from "../../lib/useReducedMotion.ts";
 import { useSpeech } from "../../lib/useSpeech.ts";
@@ -22,12 +23,14 @@ import {
   ChevronRightIcon,
   CloseIcon,
   PauseIcon,
+  PlayIcon,
   ReplayIcon,
   VolumeIcon,
   WaveIcon,
 } from "../icons.tsx";
 import { usePrefs } from "../prefs.tsx";
 import { Button, Card, HeaderButton, NoiseLevel } from "../ui.tsx";
+import { PointsList, PointsOverlay } from "./points.tsx";
 import { SoundSheet } from "./sound-sheet.tsx";
 
 const t = es.publica;
@@ -39,28 +42,65 @@ export function spokenText(step: Step): string {
     .join(". ");
 }
 
+/** How much of the screen's height a clip with points may take: they need the whole frame. */
+const FRAMED_HEIGHT_DVH = 60;
+
 function Clip({
   step,
   still,
   paused,
+  frozen,
   replayToken,
+  resumeToken,
   onEnded,
+  onFreeze,
+  onRestart,
 }: {
   step: Step;
   still: boolean;
   paused: boolean;
+  /** The clip is stopped on the photo, with the points of this step drawn over it. */
+  frozen: boolean;
   /** Bumped by the player to start the clip over, so "Repetir" can sit next to "Seguir". */
   replayToken: number;
+  /** Bumped by the player to carry on from the photo, once the person asks for it. */
+  resumeToken: number;
   onEnded: () => void;
+  onFreeze: () => void;
+  onRestart: () => void;
 }) {
   const video = useRef<HTMLVideoElement>(null);
+  const points = step.points_of_interest ?? [];
+  const framed = points.length > 0;
+  // The video's own size, which is what the points' coordinates are relative to.
+  const [frame, setFrame] = useState<{ width: number; height: number } | null>(null);
+  // The clip stops on the photo once per run, not every time it passes that second.
+  const stopped = useRef(still);
 
   useEffect(() => {
     const element = video.current;
     if (!element || replayToken === 0) return;
+    stopped.current = false;
     element.currentTime = 0;
     void element.play();
   }, [replayToken]);
+
+  useEffect(() => {
+    if (resumeToken > 0) void video.current?.play();
+  }, [resumeToken]);
+
+  // Stops on the frame the points were found in, so they sit on what the person is looking at.
+  // Nothing resumes by itself: carrying on is the person's button.
+  function stopOnThePhoto() {
+    const element = video.current;
+    if (!element || !framed || stopped.current) return;
+    const at = pauseSecond(step);
+    if (element.currentTime < at) return;
+    stopped.current = true;
+    element.pause();
+    element.currentTime = at;
+    onFreeze();
+  }
 
   if (!step.clip_url) {
     return step.photo_url ? (
@@ -71,8 +111,19 @@ function Clip({
     );
   }
 
+  // A clip with points keeps the shape it was filmed in, so nothing is cropped away; the others
+  // keep the 4:3 window. Until the size is known a phone's portrait is assumed, so the box rarely
+  // changes shape once the video loads.
+  const ratio = frame ? frame.width / frame.height : 9 / 16;
   return (
-    <div className="relative">
+    <div
+      className="relative mx-auto"
+      style={
+        framed
+          ? { aspectRatio: String(ratio), width: `min(100%, ${FRAMED_HEIGHT_DVH * ratio}dvh)` }
+          : undefined
+      }
+    >
       <video
         ref={video}
         src={step.clip_url}
@@ -84,11 +135,21 @@ function Clip({
         autoPlay={!still}
         controls={false}
         onEnded={onEnded}
-        className="aspect-[4/3] w-full rounded-3xl bg-salvia object-cover"
+        onLoadedMetadata={(event) => {
+          const { videoWidth, videoHeight } = event.currentTarget;
+          if (videoWidth && videoHeight) setFrame({ width: videoWidth, height: videoHeight });
+        }}
+        onTimeUpdate={stopOnThePhoto}
+        className={
+          framed
+            ? "h-full w-full rounded-3xl bg-salvia object-contain"
+            : "aspect-[4/3] w-full rounded-3xl bg-salvia object-cover"
+        }
       />
+      {frozen && frame && <PointsOverlay points={points} width={frame.width} height={frame.height} />}
       <span className="absolute top-3 left-3 flex items-center gap-2 rounded-full bg-tinta/80 px-3 py-1 text-base font-bold text-niebla">
-        {paused && <PauseIcon size={18} />}
-        {paused ? t.player.paused : t.player.silent}
+        {(paused || frozen) && <PauseIcon size={18} />}
+        {paused || frozen ? t.player.paused : t.player.silent}
       </span>
       <button
         type="button"
@@ -96,6 +157,8 @@ function Clip({
         onClick={() => {
           const element = video.current;
           if (!element) return;
+          stopped.current = false;
+          onRestart();
           element.currentTime = 0;
           void element.play();
         }}
@@ -113,14 +176,19 @@ function StepBody({
   sound,
   ambience,
   speech,
+  frozen,
   onAskSound,
+  onResume,
 }: {
   step: Step;
   sound: string | null;
   ambience: ReturnType<typeof useAmbience>;
   speech: ReturnType<typeof useSpeech>;
+  frozen: boolean;
   onAskSound: () => void;
+  onResume: () => void;
 }) {
+  const points = step.points_of_interest ?? [];
   return (
     <>
       <div className="mt-5 flex flex-wrap items-center justify-between gap-3">
@@ -134,6 +202,20 @@ function StepBody({
       </div>
 
       {step.easy_read_text && <p className="mt-3 text-2xl">{step.easy_read_text}</p>}
+
+      {points.length > 0 && (
+        <>
+          {/* The clip is stopped on the photo until the person says otherwise. */}
+          {frozen && (
+            <div className="mt-5">
+              <Button icon={<PlayIcon size={22} />} onClick={onResume}>
+                {t.player.resume}
+              </Button>
+            </div>
+          )}
+          <PointsList points={points} speech={speech} />
+        </>
+      )}
 
       {(step.what_to_expect.length > 0 || step.who_to_ask_for_help) && (
         <Card className="mt-5">
@@ -244,6 +326,9 @@ export function Player({
   // down, and nothing happens next until a button is pressed.
   const [ended, setEnded] = useState(false);
   const [replayToken, setReplayToken] = useState(0);
+  // The clip is stopped on the photo, showing the points of this step, and waits for the person.
+  const [frozen, setFrozen] = useState(false);
+  const [resumeToken, setResumeToken] = useState(0);
 
   const sound = soundUrlOf(step);
 
@@ -254,6 +339,10 @@ export function Player({
     setAskingSound(false);
     setEnded(false);
     setReplayToken(0);
+    setResumeToken(0);
+    // Someone who asked for less movement never sees the clip play: the still is the photo, so
+    // the points go straight on it.
+    setFrozen(still && (step.points_of_interest ?? []).length > 0);
     if (prefs.readAloud) speech.speak(spokenText(step));
     // Re-running on anything but the step would cut the person off mid-sentence.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -280,11 +369,16 @@ export function Player({
 
       <div className="mt-5">
         <Clip
+          key={step.id}
           step={step}
           still={still}
           paused={ended}
+          frozen={frozen && !ended}
           replayToken={replayToken}
+          resumeToken={resumeToken}
           onEnded={() => setEnded(true)}
+          onFreeze={() => setFrozen(true)}
+          onRestart={() => setFrozen(false)}
         />
       </div>
 
@@ -298,7 +392,12 @@ export function Player({
           sound={sound}
           ambience={ambience}
           speech={speech}
+          frozen={frozen}
           onAskSound={() => setAskingSound(true)}
+          onResume={() => {
+            setFrozen(false);
+            setResumeToken((token) => token + 1);
+          }}
         />
       )}
 
@@ -316,6 +415,7 @@ export function Player({
               icon={<ReplayIcon size={22} />}
               onClick={() => {
                 setEnded(false);
+                setFrozen(false);
                 setReplayToken((token) => token + 1);
               }}
             >

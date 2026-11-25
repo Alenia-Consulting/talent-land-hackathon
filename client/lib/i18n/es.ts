@@ -254,6 +254,12 @@ export const es = {
       replay: "Repetir el vídeo",
       listen: "Escuchar el sitio",
       readThis: "Leer en voz alta",
+      // Los puntos del paso: el vídeo se para en la foto y se señalan con una flecha, como en el
+      // diseño. Seguir lo decide la persona; nada arranca solo.
+      pointsTitle: "Para orientarte",
+      resume: "Seguir el vídeo",
+      readPoint: (nombre: string) => `Leer: ${nombre}`,
+      stopPoint: "Parar la lectura",
       stopReading: "Parar la lectura",
       previous: "Anterior",
       next: "Siguiente",
