@@ -6,8 +6,15 @@ const plural = (n: number, one: string, many: string): string => `${n} ${n === 1
 
 export const es = {
   home: {
-    record: "Grabar un recorrido",
     tagline: "Que ninguna visita sea la primera.",
+    // The door asks what you came to do, never who you are. Nothing here, and nothing stored,
+    // describes the person: see the rule at the top of lib/pure/prefs.ts.
+    visitor: "Voy a ir a un sitio",
+    visitorLead: "Mira cómo es antes de ir.",
+    venue: "Soy del centro",
+    venueLead: "Graba y publica un recorrido.",
+    back: "Volver al inicio",
+    record: "Grabar un recorrido",
     recordLead: "2 minutos con el móvil. Te guiamos.",
   },
   intro: {
