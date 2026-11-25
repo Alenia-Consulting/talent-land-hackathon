@@ -170,6 +170,13 @@ def test_the_draft_text_lands_on_the_step_with_its_blanks_listed(
     assert step["missing_fields"] == ["who_to_ask_for_help"]
     # Drafted by the AI, not reviewed: a person still has to approve it.
     assert step["reviewed"] is False
+    # The original draft is kept apart from the editable fields, with who wrote it and when.
+    db_session.refresh(guide)
+    draft = guide.steps[0].ai_draft
+    assert draft["model"] == gemini.DEFAULT_MODEL
+    assert draft["generated_at"]
+    assert draft["easy_read_text"] == "Llegas al mostrador azul. Dices tu nombre."
+    assert draft["who_to_ask_for_help"] is None
     assert response.json()["pending"]["missing_data"] == 1
 
 
@@ -191,3 +198,29 @@ def test_a_gemini_failure_keeps_the_media_and_leaves_the_text_empty(
     assert step["clip_url"].endswith(f"{guide.id}/paso-1.mp4")  # the media is stored regardless
     assert step["easy_read_text"] is None
     assert response.json()["pending"]["missing_data"] == 1
+
+
+def test_editing_a_step_leaves_the_original_ai_draft_untouched(
+    client, db_session, make_guide, make_step, monkeypatch, tmp_path
+):
+    guide = stored_guide(db_session, make_guide, make_step, monkeypatch, tmp_path)
+    monkeypatch.setattr("ai.gemini._send", lambda *_: answer())
+    step_id = upload(client, guide.id).json()["steps"][0]["id"]
+
+    edited = client.patch(f"/guides/{guide.id}/steps/{step_id}", json={"easy_read_text": "Texto corregido."})
+
+    assert edited.json()["steps"][0]["easy_read_text"] == "Texto corregido."
+    db_session.refresh(guide)
+    assert guide.steps[0].ai_draft["easy_read_text"] == "Llegas al mostrador azul. Dices tu nombre."
+
+
+def test_a_step_gemini_could_not_describe_has_no_draft(
+    client, db_session, make_guide, make_step, monkeypatch, tmp_path
+):
+    guide = stored_guide(db_session, make_guide, make_step, monkeypatch, tmp_path)
+    monkeypatch.delenv("GEMINI_API_KEY")
+
+    upload(client, guide.id)
+
+    db_session.refresh(guide)
+    assert guide.steps[0].ai_draft is None
