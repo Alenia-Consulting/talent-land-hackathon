@@ -12,7 +12,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import { ApiError, type GuideSummary, listGuides } from "../../lib/guides.ts";
 import { es } from "../../lib/i18n/es.ts";
-import { AntesalaMark, SearchIcon, VideoIcon } from "../icons.tsx";
+import { AntesalaMark, ChevronRightIcon, SearchIcon, VideoIcon } from "../icons.tsx";
 import { Card, StatusChip } from "../ui.tsx";
 
 const t = es.panel;
@@ -211,22 +211,33 @@ export default function PanelPage() {
           ) : (
             <ul className="mt-2">
               {shown.map((guide, index) => (
-                <li key={guide.id} className={index > 0 ? "border-t border-tinta/10" : undefined}>
+                <li
+                  key={guide.id}
+                  className={`min-w-0 ${index > 0 ? "border-t border-tinta/10" : ""}`}
+                >
+                  {/* Two lines, whatever the width: wrapping turned one guide into four rows on
+                      a phone, and a list you cannot run your eye down is not a list. */}
                   <Link
                     href={`/panel/guia?id=${guide.id}`}
-                    className="flex flex-wrap items-center gap-4 px-1 py-4"
+                    className="flex items-center gap-4 px-1 py-4"
                   >
                     <Thumbnail guide={guide} />
-                    <span className="min-w-0 flex-1 basis-48">
-                      <span className="block text-xl font-bold">{guide.title}</span>
-                      <span className="block text-base text-tinta/60">{guide.venue_name}</span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-xl font-bold">{guide.title}</span>
+                      {/* The state sits under the title rather than beside it: on the right it
+                          was a fixed column that left the titles a dozen characters wide. */}
+                      <span className="flex min-w-0 items-center gap-2">
+                        <StatusChip status={guide.status} />
+                        <span className="truncate text-base text-tinta/60">
+                          {guide.venue_name} · {t.lastReview}: {reviewedLabel(guide.reviewed_at)}
+                        </span>
+                      </span>
                     </span>
-                    <StatusChip status={guide.status} />
-                    <span className="text-base text-tinta/60">
-                      {t.lastReview}: {reviewedLabel(guide.reviewed_at)}
-                    </span>
-                    <span className="font-bold text-pino underline">
+                    <span className="hidden font-bold text-pino underline sm:inline">
                       {isPending(guide) ? t.review : t.edit}
+                    </span>
+                    <span aria-hidden="true" className="text-pino">
+                      <ChevronRightIcon size={22} />
                     </span>
                   </Link>
                 </li>
