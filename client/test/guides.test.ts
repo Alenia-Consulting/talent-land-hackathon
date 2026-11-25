@@ -7,6 +7,7 @@ import {
   createGuide,
   deleteGuide,
   listGuides,
+  listPublicGuides,
   patchStep,
   publishGuide,
   readGuide,
@@ -191,4 +192,15 @@ test("deleteGuide reports why storage refused", async () => {
   await assert.rejects(deleteGuide("abc", fetchImpl), (error: unknown) => {
     return error instanceof ApiError && error.status === 502 && /storage/.test(error.message);
   });
+});
+
+test("listPublicGuides asks for the whole catalogue, not a first page", async () => {
+  // A page the screen cannot turn is a guide the visitor is told does not exist: there are no
+  // pagination controls, so whatever this asks for is all there is.
+  const { calls, fetchImpl } = spy(200, []);
+
+  await listPublicGuides({}, fetchImpl);
+
+  assert.equal(calls[0].url, "/api/public/guides?limit=200&offset=0");
+  assert.equal(calls[0].method, "GET");
 });

@@ -86,7 +86,9 @@ export default function Buscar() {
     listPublicGuides()
       .then(setGuides)
       .catch((cause: unknown) => {
-        setError(cause instanceof ApiError ? cause.message : String(cause));
+        // Only strings this app owns reach the screen. A 5xx carries FastAPI's `detail`, in
+        // English, and this screen is read by people for whom that is a wall.
+        setError(cause instanceof ApiError && cause.status === 0 ? cause.message : t.errorServer);
       });
   }, []);
 

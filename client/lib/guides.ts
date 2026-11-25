@@ -156,9 +156,14 @@ export function readPublicGuide(slug: string, fetchImpl?: typeof fetch): Promise
   return request<Guide>(`/public/${slug}`, { method: "GET" }, fetchImpl);
 }
 
-/** GET /public/guides — the catalogue somebody browses when nobody sent them a link. */
+/**
+ * GET /public/guides — the catalogue somebody browses when nobody sent them a link.
+ *
+ * Asks for the endpoint's whole allowance, because the screen has no way to turn a page: a
+ * guide left off the first page is a guide the visitor is told does not exist.
+ */
 export function listPublicGuides(
-  { limit = 50, offset = 0 }: { limit?: number; offset?: number } = {},
+  { limit = 200, offset = 0 }: { limit?: number; offset?: number } = {},
   fetchImpl?: typeof fetch,
 ): Promise<PublicGuide[]> {
   return request<PublicGuide[]>(

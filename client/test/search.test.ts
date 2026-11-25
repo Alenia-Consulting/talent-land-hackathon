@@ -51,3 +51,10 @@ test("que no haya ningún recorrido publicado no es lo mismo que no encontrar", 
   assert.equal(catalogueState({ guides: [], matches: [], error: null }), "empty");
   assert.equal(catalogueState({ guides: CATALOGUE, matches: [], error: null }), "noMatch");
 });
+
+test("una consulta con acentos encuentra un nombre escrito sin ellos, y al revés", () => {
+  const acentuado = [{ venue_name: "Clínica Dental Alameda", title: "Recorrido principal" }];
+
+  assert.equal(filterCatalogue(CATALOGUE, "generál").length, 2);
+  assert.equal(filterCatalogue(acentuado, "clinica").length, 1);
+});
