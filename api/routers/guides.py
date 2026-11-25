@@ -70,6 +70,7 @@ def _write_texts(by_position: dict, processed: list[pipeline.ProcessedStep]) -> 
             title=by_position[item.position].title,
             category=by_position[item.position].category,
             clip=item.clip,
+            photo=item.photo,
         )
         for item in processed
         if item.position in by_position
@@ -83,6 +84,7 @@ def _write_texts(by_position: dict, processed: list[pipeline.ProcessedStep]) -> 
         step.who_to_ask_for_help = text.who_to_ask_for_help
         step.duration_text = text.duration_text
         step.interests = text.interests
+        step.points_of_interest = text.points_of_interest
         step.missing_fields = text.missing_fields
         step.ai_draft = {
             "model": gemini.model_name(),

@@ -12,12 +12,37 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from db.models import NOISE_LEVELS, STEP_CATEGORIES, STEP_INTERESTS
+from db.models import MAX_POINTS, NOISE_LEVELS, POINT_KINDS, STEP_CATEGORIES, STEP_INTERESTS
 from media import storage
 
 Category = Literal[STEP_CATEGORIES]
 NoiseLevel = Literal[NOISE_LEVELS]
 Interest = Literal[STEP_INTERESTS]
+PointKind = Literal[POINT_KINDS]
+
+
+class PointOfInterest(BaseModel):
+    """Something on the step's photo worth pointing at, to help a visitor find their way."""
+
+    label: str = Field(min_length=1, max_length=60,
+                       description="Two to four words, shown next to the arrow: 'Entrada de cristal'.")
+    description: str = Field(
+        min_length=1, max_length=160,
+        description="One or two short sentences read aloud by the device: 'Busca las puertas de "
+                    "cristal. Cruza por la abertura para entrar.'")
+    kind: PointKind
+    box_2d: list[int] = Field(
+        min_length=4, max_length=4,
+        description="[ymin, xmin, ymax, xmax], each from 0 to 1000 of the photo's height or "
+                    "width. Relative, so it fits any screen size.")
+
+    @field_validator("box_2d")
+    @classmethod
+    def _box_is_inside_the_photo(cls, box: list[int]) -> list[int]:
+        ymin, xmin, ymax, xmax = box
+        if not all(0 <= value <= 1000 for value in box) or ymin >= ymax or xmin >= xmax:
+            raise ValueError("box_2d must be [ymin, xmin, ymax, xmax] from 0 to 1000, min < max")
+        return box
 
 
 class MarkIn(BaseModel):
@@ -57,6 +82,7 @@ class StepPatch(BaseModel):
     who_to_ask_for_help: str | None = None
     duration_text: str | None = Field(default=None, max_length=80)
     interests: list[Interest] | None = None
+    points_of_interest: list[PointOfInterest] | None = Field(default=None, max_length=MAX_POINTS)
     noise_level: NoiseLevel | None = None
     missing_fields: list[str] | None = None
     reviewed: bool | None = None
@@ -85,6 +111,9 @@ class StepOut(BaseModel):
     category: str
     interests: list[str] = Field(
         description="Which of the visitor's \"Que quieres ver antes?\" filters this step answers.")
+    points_of_interest: list[PointOfInterest] = Field(
+        description="Up to 3 things to point at on `photo_url`, drawn by the front over the clip "
+                    "paused at `photo_second`. Drafted by the AI, corrected by the venue.")
     missing_fields: list[str] = Field(
         description="Blanks the venue must still fill in. Publishing is refused while any "
                     "step has one.",

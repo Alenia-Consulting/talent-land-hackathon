@@ -372,6 +372,32 @@ export interface components {
             /** Missing Data */
             missing_data: number;
         };
+        /**
+         * PointOfInterest
+         * @description Something on the step's photo worth pointing at, to help a visitor find their way.
+         */
+        PointOfInterest: {
+            /**
+             * Label
+             * @description Two to four words, shown next to the arrow: 'Entrada de cristal'.
+             */
+            label: string;
+            /**
+             * Description
+             * @description One or two short sentences read aloud by the device: 'Busca las puertas de cristal. Cruza por la abertura para entrar.'
+             */
+            description: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "exit" | "door" | "window" | "table" | "counter" | "restroom" | "ramp" | "rest_area" | "other";
+            /**
+             * Box 2D
+             * @description [ymin, xmin, ymax, xmax], each from 0 to 1000 of the photo's height or width. Relative, so it fits any screen size.
+             */
+            box_2d: number[];
+        };
         /** StepOut */
         StepOut: {
             /**
@@ -428,6 +454,11 @@ export interface components {
              * @description Which of the visitor's "Que quieres ver antes?" filters this step answers.
              */
             interests: string[];
+            /**
+             * Points Of Interest
+             * @description Up to 3 things to point at on `photo_url`, drawn by the front over the clip paused at `photo_second`. Drafted by the AI, corrected by the venue.
+             */
+            points_of_interest: components["schemas"]["PointOfInterest"][];
             /**
              * Missing Fields
              * @description Blanks the venue must still fill in. Publishing is refused while any step has one.
@@ -492,6 +523,8 @@ export interface components {
             duration_text?: string | null;
             /** Interests */
             interests?: ("where_to_wait" | "noisy_areas" | "restrooms" | "who_to_ask" | "exit")[] | null;
+            /** Points Of Interest */
+            points_of_interest?: components["schemas"]["PointOfInterest"][] | null;
             /** Noise Level */
             noise_level?: ("quiet" | "medium" | "noisy") | null;
             /** Missing Fields */

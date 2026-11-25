@@ -824,6 +824,58 @@
         "title": "Pending",
         "description": "Drives \"3 de 5 pasos revisados\" and \"2 datos por completar\" in the panel."
       },
+      "PointOfInterest": {
+        "properties": {
+          "label": {
+            "type": "string",
+            "maxLength": 60,
+            "minLength": 1,
+            "title": "Label",
+            "description": "Two to four words, shown next to the arrow: 'Entrada de cristal'."
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Description",
+            "description": "One or two short sentences read aloud by the device: 'Busca las puertas de cristal. Cruza por la abertura para entrar.'"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "exit",
+              "door",
+              "window",
+              "table",
+              "counter",
+              "restroom",
+              "ramp",
+              "rest_area",
+              "other"
+            ],
+            "title": "Kind"
+          },
+          "box_2d": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "maxItems": 4,
+            "minItems": 4,
+            "title": "Box 2D",
+            "description": "[ymin, xmin, ymax, xmax], each from 0 to 1000 of the photo's height or width. Relative, so it fits any screen size."
+          }
+        },
+        "type": "object",
+        "required": [
+          "label",
+          "description",
+          "kind",
+          "box_2d"
+        ],
+        "title": "PointOfInterest",
+        "description": "Something on the step's photo worth pointing at, to help a visitor find their way."
+      },
       "StepOut": {
         "properties": {
           "id": {
@@ -910,6 +962,14 @@
             "type": "array",
             "title": "Interests",
             "description": "Which of the visitor's \"Que quieres ver antes?\" filters this step answers."
+          },
+          "points_of_interest": {
+            "items": {
+              "$ref": "#/components/schemas/PointOfInterest"
+            },
+            "type": "array",
+            "title": "Points Of Interest",
+            "description": "Up to 3 things to point at on `photo_url`, drawn by the front over the clip paused at `photo_second`. Drafted by the AI, corrected by the venue."
           },
           "missing_fields": {
             "items": {
@@ -1004,6 +1064,7 @@
           "duration_text",
           "category",
           "interests",
+          "points_of_interest",
           "missing_fields",
           "reviewed",
           "clip_url",
@@ -1135,6 +1196,21 @@
               }
             ],
             "title": "Interests"
+          },
+          "points_of_interest": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/PointOfInterest"
+                },
+                "type": "array",
+                "maxItems": 3
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Points Of Interest"
           },
           "noise_level": {
             "anyOf": [
