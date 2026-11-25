@@ -10,6 +10,7 @@
 // and nothing on the backend ever shortens that list (api/db/guides.py, `_data_is_missing`). If
 // the panel does not send it back shortened, a guide with one blank can never be published.
 
+import { type Point, pointsAreSendable } from "./points.ts";
 import { missingFieldsOf } from "./review.ts";
 
 /** The three levels the contract allows. Kept here so lib/pure stays free of the API client. */
@@ -21,6 +22,8 @@ export type Draft = {
   who_to_ask_for_help: string;
   duration_text: string;
   noise_level: Noise | "";
+  /** The places the clip points at. Edited as a whole list, never field by field. */
+  points_of_interest: Point[];
 };
 
 export const DRAFT_FIELDS = [
@@ -40,6 +43,7 @@ type EditableStep = {
   who_to_ask_for_help?: string | null;
   duration_text?: string | null;
   noise_level?: string | null;
+  points_of_interest?: Point[] | null;
   missing_fields: string[];
 };
 
@@ -49,6 +53,7 @@ export type Changes = {
   who_to_ask_for_help?: string | null;
   duration_text?: string | null;
   noise_level?: Noise | null;
+  points_of_interest?: Point[];
   missing_fields?: string[];
   reviewed?: boolean;
 };
@@ -62,6 +67,7 @@ export function draftOf(step: EditableStep): Draft {
     duration_text: text(step.duration_text),
     // The contract types the answer as a plain string; the three values are the request side.
     noise_level: text(step.noise_level) as Noise | "",
+    points_of_interest: step.points_of_interest ?? [],
   };
 }
 
@@ -106,6 +112,20 @@ export function changesOf(step: EditableStep, draft: Draft): Changes | null {
   }
   if (draft.noise_level !== text(step.noise_level)) {
     changes.noise_level = draft.noise_level === "" ? null : draft.noise_level;
+  }
+
+  // The whole list travels, trimmed, only when it differs from the server's and the API would
+  // take it. The AI's original stays on the server in `ai_draft`, so correcting it loses nothing.
+  const points = draft.points_of_interest.map((point) => ({
+    ...point,
+    label: point.label.trim(),
+    description: point.description.trim(),
+  }));
+  if (
+    pointsAreSendable(points) &&
+    JSON.stringify(points) !== JSON.stringify(step.points_of_interest ?? [])
+  ) {
+    changes.points_of_interest = points;
   }
 
   const missing = blanksAmong(step.missing_fields, draft);

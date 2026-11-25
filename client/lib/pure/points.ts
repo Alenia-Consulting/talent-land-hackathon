@@ -72,3 +72,46 @@ export function layoutPoint(point: Point, frameWidth: number, frameHeight: numbe
     unit,
   };
 }
+
+// --- What the venue does to the points in the panel -------------------------------------------
+
+/** The API refuses a step with more points than this. */
+export const MAX_POINTS = 3;
+/** Smallest a box may be made: a point the visitor could still find, as a share of 1000. */
+const MIN_SIDE = 40;
+
+const clampBox = (start: number, side: number): [number, number] => {
+  const begin = clamp(start, 0, 1000 - side);
+  return [Math.round(begin), Math.round(begin + side)];
+};
+
+/** The same point with its box centred on (x, y), each a share of the photo from 0 to 1. */
+export function movePoint(point: Point, x: number, y: number): Point {
+  const [ymin, xmin, ymax, xmax] = point.box_2d;
+  const [top, bottom] = clampBox(clamp(y, 0, 1) * 1000 - (ymax - ymin) / 2, ymax - ymin);
+  const [left, right] = clampBox(clamp(x, 0, 1) * 1000 - (xmax - xmin) / 2, xmax - xmin);
+  return { ...point, box_2d: [top, left, bottom, right] };
+}
+
+/** The same point with a bigger or smaller box around the same centre. */
+export function scalePoint(point: Point, factor: number): Point {
+  const [ymin, xmin, ymax, xmax] = point.box_2d;
+  const height = clamp((ymax - ymin) * factor, MIN_SIDE, 1000);
+  const width = clamp((xmax - xmin) * factor, MIN_SIDE, 1000);
+  const [top, bottom] = clampBox((ymin + ymax) / 2 - height / 2, height);
+  const [left, right] = clampBox((xmin + xmax) / 2 - width / 2, width);
+  return { ...point, box_2d: [top, left, bottom, right] };
+}
+
+/**
+ * Whether the API would accept these points: a name and something to read aloud on each one.
+ *
+ * The panel saves by itself while someone types, and a point whose name was just emptied would be
+ * refused with a 422. Until it is filled in again, the points are simply not sent.
+ */
+export function pointsAreSendable(points: readonly Point[]): boolean {
+  return (
+    points.length <= MAX_POINTS &&
+    points.every((point) => point.label.trim() !== "" && point.description.trim() !== "")
+  );
+}

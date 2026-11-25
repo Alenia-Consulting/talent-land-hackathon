@@ -66,3 +66,42 @@ test("the label grows with its text and the strokes grow with the frame", () => 
   assert.ok(long.label.width > short.label.width);
   assert.equal(big.unit, short.unit * 2);
 });
+
+import { movePoint, pointsAreSendable, scalePoint } from "../lib/pure/points.ts";
+
+test("moving a point centres its box on the tapped place and keeps its size", () => {
+  const moved = movePoint(point([500, 100, 600, 300]), 0.5, 0.25);
+
+  assert.deepEqual(moved.box_2d, [200, 400, 300, 600]);
+});
+
+test("a point cannot be moved out of the photo", () => {
+  assert.deepEqual(movePoint(point([500, 100, 600, 300]), 0, 0).box_2d, [0, 0, 100, 200]);
+  assert.deepEqual(movePoint(point([500, 100, 600, 300]), 1, 1).box_2d, [900, 800, 1000, 1000]);
+});
+
+test("a bigger or smaller box keeps its centre", () => {
+  const bigger = scalePoint(point([400, 400, 600, 600]), 1.5);
+  const smaller = scalePoint(point([400, 400, 600, 600]), 0.5);
+
+  assert.deepEqual(bigger.box_2d, [350, 350, 650, 650]);
+  assert.deepEqual(smaller.box_2d, [450, 450, 550, 550]);
+});
+
+test("a box never shrinks to nothing nor grows past the photo", () => {
+  const tiny = scalePoint(point([400, 400, 440, 440]), 0.1);
+  const huge = scalePoint(point([100, 100, 900, 900]), 5);
+
+  assert.deepEqual(tiny.box_2d, [400, 400, 440, 440]);
+  assert.deepEqual(huge.box_2d, [0, 0, 1000, 1000]);
+});
+
+test("points are sent only when each one has a name and something to read aloud", () => {
+  const ok = point([100, 100, 300, 300]);
+
+  assert.equal(pointsAreSendable([ok]), true);
+  assert.equal(pointsAreSendable([]), true);
+  assert.equal(pointsAreSendable([{ ...ok, label: "  " }]), false);
+  assert.equal(pointsAreSendable([{ ...ok, description: "" }]), false);
+  assert.equal(pointsAreSendable([ok, ok, ok, ok]), false);
+});

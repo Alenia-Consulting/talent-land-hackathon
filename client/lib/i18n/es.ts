@@ -199,6 +199,21 @@ export const es = {
       missing: (campo: string) => `Falta: ${campo}`,
       // What easy read actually asks for, next to the box where it is written.
       easyReadHints: ["Frases cortas", "Una idea por frase", "Segunda persona"],
+      // Los puntos que señala el vídeo. La IA los propone sobre la foto y el centro los corrige:
+      // una flecha mal puesta en una guía de orientación desorienta más que ninguna flecha.
+      points: {
+        title: "Puntos de interés",
+        hint: "La IA los propuso sobre esta foto. Comprueba que cada flecha apunta a lo que dice; si no, muévela o bórrala.",
+        none: "No hay puntos claros en esta foto. No se inventa ninguno.",
+        label: "Nombre",
+        description: "Qué hacer (se lee en voz alta)",
+        move: "Mover",
+        moving: "Toca la foto donde está",
+        bigger: "Más grande",
+        smaller: "Más pequeña",
+        remove: "Borrar",
+        photoAlt: "Foto del paso con los puntos marcados",
+      },
       // El panel se guarda solo, así que no hay botón de guardar: hay un estado que decir.
       autosave: {
         pending: "Sin guardar",

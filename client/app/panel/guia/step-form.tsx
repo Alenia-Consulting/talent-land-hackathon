@@ -18,6 +18,7 @@ import { type Draft, missingInDraft, type Noise } from "../../../lib/pure/draft.
 import { Segmented } from "../../controls.tsx";
 import { AlertIcon, CheckIcon, ChevronRightIcon } from "../../icons.tsx";
 import { Card, MissingChip, NoiseLevel } from "../../ui.tsx";
+import { PointsEditor } from "./points-editor.tsx";
 import type { SaveState } from "./useReview.ts";
 
 const t = es.panel.detail;
@@ -291,6 +292,17 @@ export function StepForm({
               )}
             </span>
           </div>
+
+          <PointsEditor
+            step={step}
+            points={draft.points_of_interest}
+            onChange={(points, now) => {
+              onEdit({ points_of_interest: points });
+              // Moving, resizing and deleting are decisions, not typing: they go out at once.
+              if (now) onSave();
+            }}
+            onSave={onSave}
+          />
         </div>
 
         {missing.length > 0 && (
