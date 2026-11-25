@@ -97,9 +97,16 @@ def test_the_video_cannot_end_before_the_last_mark(db_session):
         create(db_session, video_duration_seconds=20.0)
 
 
-def test_a_route_needs_at_least_two_marks(db_session):
-    with pytest.raises(ValueError, match="two"):
-        create(db_session, marks=MARKS[:1])
+def test_a_route_needs_at_least_one_mark(db_session):
+    with pytest.raises(ValueError, match="one mark"):
+        create(db_session, marks=[])
+
+
+def test_a_single_mark_runs_to_the_end_of_the_video(db_session):
+    created = create(db_session, marks=MARKS[:1])
+
+    assert len(created.steps) == 1
+    assert created.steps[0].end_seconds == 48.0
 
 
 def test_a_new_step_has_no_text_yet(db_session):

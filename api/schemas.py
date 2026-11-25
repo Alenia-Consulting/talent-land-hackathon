@@ -61,7 +61,7 @@ class GuideCreate(BaseModel):
     venue_name: str = Field(min_length=1, max_length=200)
     video_duration_seconds: float = Field(gt=0)
     marks: list[MarkIn] = Field(
-        min_length=2, max_length=12,
+        min_length=1, max_length=12,
         description="One per part reached, in order. Must move forward in time and all fall "
                     "before video_duration_seconds. Each mark becomes a step running to the next.",
     )
@@ -75,7 +75,7 @@ class RouteCreate(BaseModel):
                        description="Name of this recording: 'Entrada principal', 'Sala de rayos X'.")
     video_duration_seconds: float = Field(gt=0)
     marks: list[MarkIn] = Field(
-        min_length=2, max_length=12,
+        min_length=1, max_length=12,
         description="Same rules as when creating a guide. The steps continue the guide's numbering.",
     )
 

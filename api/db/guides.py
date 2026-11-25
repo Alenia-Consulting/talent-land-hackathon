@@ -25,7 +25,7 @@ DEFAULT_PAGE_SIZE = 20
 # The recording screen asks the person to stand still for 3 seconds on arrival. The clearest frame
 # is in the middle of that pause, and that is also the stretch where the noise is measured.
 PAUSE_SECONDS = 3.0
-MIN_MARKS = 2
+MIN_MARKS = 1
 
 
 def create(
@@ -132,7 +132,7 @@ def _steps_from_marks(
     """Turn the marks into stretches of video: each step runs until the next mark."""
     marks = list(marks)
     if len(marks) < MIN_MARKS:
-        raise ValueError("a route needs at least two marks")
+        raise ValueError("a route needs at least one mark")
 
     times = [mark["marked_at_seconds"] for mark in marks]
     if any(later <= earlier for earlier, later in zip(times, times[1:], strict=False)):

@@ -615,7 +615,7 @@
             },
             "type": "array",
             "maxItems": 12,
-            "minItems": 2,
+            "minItems": 1,
             "title": "Marks",
             "description": "One per part reached, in order. Must move forward in time and all fall before video_duration_seconds. Each mark becomes a step running to the next."
           },
@@ -1073,7 +1073,7 @@
             },
             "type": "array",
             "maxItems": 12,
-            "minItems": 2,
+            "minItems": 1,
             "title": "Marks",
             "description": "Same rules as when creating a guide. The steps continue the guide's numbering."
           }

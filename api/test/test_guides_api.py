@@ -108,8 +108,17 @@ def test_marks_that_go_backwards_are_rejected(client):
     assert "forward" in response.json()["detail"]
 
 
-def test_a_route_with_a_single_mark_is_rejected(client):
+def test_a_single_mark_is_a_route_that_runs_to_the_end_of_the_video(client):
     response = create_guide(client, marks=PAYLOAD["marks"][:1])
+
+    assert response.status_code == 201
+    steps = response.json()["steps"]
+    assert len(steps) == 1
+    assert steps[0]["end_seconds"] == PAYLOAD["video_duration_seconds"]
+
+
+def test_a_route_without_marks_is_rejected(client):
+    response = create_guide(client, marks=[])
 
     assert response.status_code == 422
 

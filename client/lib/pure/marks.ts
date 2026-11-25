@@ -12,7 +12,7 @@ export type Part = { title: string; category: Category };
 export const PAUSE_MS = 3000;
 
 /** The API refuses a route with fewer marks than this. */
-export const MIN_MARKS = 2;
+export const MIN_MARKS = 1;
 
 /** The API refuses more than this, and a longer route does not fit in a two minute video. */
 export const MAX_MARKS = 12;
@@ -58,9 +58,7 @@ export function markAt(part: Part, elapsedMs: number): Mark {
  */
 export function whyNotSendable(marks: Mark[], durationSec: number): string | null {
   if (marks.length < MIN_MARKS) {
-    return marks.length === 0
-      ? "No marcaste ninguna parte. Repite la grabación y pulsa «Llegué a» al llegar a cada una."
-      : "Solo marcaste una parte, y hacen falta dos. Repite la grabación y pulsa «Llegué a» en cada parte.";
+    return "No marcaste ninguna parte. Repite la grabación y pulsa «Llegué a» al llegar a cada una.";
   }
   if (marks.length > MAX_MARKS) {
     return `Son demasiadas partes: ${marks.length}. El máximo es ${MAX_MARKS}.`;
