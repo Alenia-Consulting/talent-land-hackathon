@@ -26,15 +26,15 @@
 
 Lo que la especificación implica, ningún test de tarea ejercita y más probablemente muerde a alguien:
 
-1. **El fichero dura más que el reloj del móvil.** `useRecorder` guarda `Math.min(measured, 120)`, así que al llegar al tope el fichero puede durar 120,4 s y la cola se perdería si la medida solo recortase. → test en Tarea 1.
-2. **Borrar el único recorrido de una guía publicada** dejaría un enlace público, quizá ya impreso en un QR, apuntando a una guía sin nada. → 409, test en Tarea 4.
-3. **Reintentar la primera toma tras un fallo de subida** no debe crear una segunda guía: la guía ya existe y se reutiliza. → test en Tarea 7.
-4. **Una toma sin audio utilizable** deja el nivel vacío, y la hoja de sonido no puede anunciar «tranquilo». → test en Tarea 5.
-5. **Un nivel puesto a mano no puede ser pisado por una medida posterior**, o la respuesta de la persona que estuvo allí desaparece sola. → test en Tarea 5.
+1. **El fichero dura más que el reloj del móvil.** `useRecorder` guarda `Math.min(measured, 120)`, así que al llegar al tope el fichero puede durar 120,4 s y la cola se perdería si la medida solo recortase. → test en Task 1.
+2. **Borrar el único recorrido de una guía publicada** dejaría un enlace público, quizá ya impreso en un QR, apuntando a una guía sin nada. → 409, test en Task 4.
+3. **Reintentar la primera toma tras un fallo de subida** no debe crear una segunda guía: la guía ya existe y se reutiliza. → test en Task 7.
+4. **Una toma sin audio utilizable** deja el nivel vacío, y la hoja de sonido no puede anunciar «tranquilo». → test en Task 5.
+5. **Un nivel puesto a mano no puede ser pisado por una medida posterior**, o la respuesta de la persona que estuvo allí desaparece sola. → test en Task 5.
 
 ---
 
-## Tarea 1: La API mide la duración y recoloca los pasos
+### Task 1: La API mide la duración y recoloca los pasos
 
 **Files:**
 - Modify: `api/media/video_io.py`
@@ -143,14 +143,14 @@ git commit -m "(fix) Measure the real duration of a recording instead of trustin
 
 ---
 
-## Tarea 2: Un paso sin fotogramas no tumba la subida
+### Task 2: Un paso sin fotogramas no tumba la subida
 
 **Files:**
 - Modify: `api/media/pipeline.py:88-100`
 - Test: `api/test/test_pipeline.py`
 
 **Interfaces:**
-- Consumes: `video_io.read_frames`, `video_io.duration` (Tarea 1).
+- Consumes: `video_io.read_frames`, `video_io.duration` (Task 1).
 - Produces: nada nuevo; cambia el comportamiento de `pipeline.process` ante un tramo vacío.
 
 - [ ] **Step 1: Escribir los tests que fallan** en `api/test/test_pipeline.py`
@@ -204,7 +204,7 @@ git commit -m "(fix) Rescue a step whose range falls past the end of the recordi
 
 ---
 
-## Tarea 3: Un recorrido sabe en qué posición va
+### Task 3: Un recorrido sabe en qué posición va
 
 **Files:**
 - Modify: `api/db/guides.py` (`add_route`, nuevo `_renumber`)
@@ -296,7 +296,7 @@ git commit -m "(feat) Let a route be inserted in a place of its own"
 
 ---
 
-## Tarea 4: Borrar un recorrido
+### Task 4: Borrar un recorrido
 
 **Files:**
 - Modify: `api/db/guides.py` (`route_media_paths`, `delete_route`)
@@ -305,7 +305,7 @@ git commit -m "(feat) Let a route be inserted in a place of its own"
 - Test: `api/test/test_guides_repository.py`, `api/test/test_guides_api.py`
 
 **Interfaces:**
-- Consumes: `_renumber` (Tarea 3), `guides.media_paths`, `storage.remove`.
+- Consumes: `_renumber` (Task 3), `guides.media_paths`, `storage.remove`.
 - Produces:
   - `guides.route_media_paths(route: Route) -> list[str]`
   - `guides.delete_route(session: Session, guide: Guide, route: Route) -> None`
@@ -390,7 +390,7 @@ git commit -m "(feat) Delete one recording of a guide with its media"
 
 ---
 
-## Tarea 5: El nivel de ruido lo dice quien graba
+### Task 5: El nivel de ruido lo dice quien graba
 
 **Files:**
 - Modify: `api/schemas.py` (`MarkIn`)
@@ -463,7 +463,7 @@ git commit -m "(feat) Let the person recording say how a place sounded"
 
 ---
 
-## Tarea 6: Las reglas de la lista de tomas
+### Task 6: Las reglas de la lista de tomas
 
 **Files:**
 - Create: `client/lib/pure/takes.ts`
@@ -532,7 +532,7 @@ Se borra, no se deja apagada. `MAX_MARKS` se queda como tope de partes del plan.
 - [ ] **Step 5: Ejecutar y ver que pasan**
 
 Run: `cd client && npm test && npm run typecheck`
-Expected: PASS; el typecheck señala quién usaba lo borrado — eso lo arregla la Tarea 7.
+Expected: PASS; el typecheck señala quién usaba lo borrado — eso lo arregla la Task 7.
 
 - [ ] **Step 6: Commit**
 
@@ -543,7 +543,7 @@ git commit -m "(feat) Add the rules of the list of takes"
 
 ---
 
-## Tarea 7: El grabador por partes
+### Task 7: El grabador por partes
 
 **Files:**
 - Create: `client/app/grabar/takes.tsx` (la pantalla de la lista)
@@ -554,7 +554,7 @@ git commit -m "(feat) Add the rules of the list of takes"
 - Test: `client/test/takes.test.ts` (ampliado), `client/test/config.test.ts`
 
 **Interfaces:**
-- Consumes: Tarea 6 entera; `createGuide`, `addRoute`, `uploadVideo` con `routeId`; `RouteCreate.position` y `GuideCreate.route_title` (Tarea 3).
+- Consumes: Task 6 entera; `createGuide`, `addRoute`, `uploadVideo` con `routeId`; `RouteCreate.position` y `GuideCreate.route_title` (Task 3).
 - Produces: fases `lista` → `permisos` → `listo` → `grabando` → `lista`.
 
 - [ ] **Step 1: Escribir el test que falla** en `client/test/config.test.ts`
@@ -582,7 +582,7 @@ La lista del diseño: una fila por parte con su estado, la acción «Grabar» en
 
 - [ ] **Step 5: Escribir el test del reintento y hacerlo pasar**
 
-La regla vive en `sendPlan` (Tarea 6) y ya está probada allí. Aquí se comprueba que la pantalla
+La regla vive en `sendPlan` (Task 6) y ya está probada allí. Aquí se comprueba que la pantalla
 la usa: tras un envío con éxito, el `guideId` queda guardado y el siguiente envío pasa por
 `addRoute`, nunca por `createGuide`.
 
@@ -595,7 +595,7 @@ de enviarla, `downloadGuide` la guarda en el móvil.
 
 - [ ] **Step 7: Preguntar cómo sonaba, una vez por toma**
 
-Al terminar la toma, la fila ofrece Tranquilo / Normal / Ruidoso. Lo elegido viaja como `noise_level` de la marca (Tarea 5). Sin respuesta, no se manda nada.
+Al terminar la toma, la fila ofrece Tranquilo / Normal / Ruidoso. Lo elegido viaja como `noise_level` de la marca (Task 5). Sin respuesta, no se manda nada.
 
 - [ ] **Step 8: Ejecutar las comprobaciones del cliente**
 
@@ -616,7 +616,7 @@ git commit -m "(feat) Record one take per part, when the person is ready"
 
 ---
 
-## Tarea 8: Repetir una toma
+### Task 8: Repetir una toma
 
 **Files:**
 - Modify: `client/lib/guides.ts` (`deleteRoute`)
@@ -624,7 +624,7 @@ git commit -m "(feat) Record one take per part, when the person is ready"
 - Test: `client/test/guides.test.ts`, `client/test/takes.test.ts`
 
 **Interfaces:**
-- Consumes: `DELETE /guides/{id}/routes/{id}` (Tarea 4), `RouteCreate.position` (Tarea 3).
+- Consumes: `DELETE /guides/{id}/routes/{id}` (Task 4), `RouteCreate.position` (Task 3).
 - Produces: `deleteRoute(guideId: string, routeId: string, fetchImpl?: typeof fetch): Promise<void>`
 
 - [ ] **Step 1: Escribir los tests que fallan**
