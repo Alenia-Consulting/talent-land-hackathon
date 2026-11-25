@@ -8,16 +8,14 @@ import Link from "next/link";
 
 import { es } from "../../lib/i18n/es.ts";
 import HealthCheck from "../health-check.tsx";
-import { Card } from "../ui.tsx";
+import { BackLink, Card } from "../ui.tsx";
 
 export default function Centro() {
   return (
     <main className="mx-auto max-w-2xl px-4 py-10">
-      <Link href="/" className="text-lg text-tinta/60 underline">
-        {es.home.back}
-      </Link>
+      <BackLink href="/" />
 
-      <h1 className="mt-4 text-4xl font-extrabold">{es.home.venue}</h1>
+      <h1 className="mt-6 text-4xl font-extrabold">{es.home.venue}</h1>
 
       <Link href="/grabar" className="mt-8 block rounded-3xl bg-pino p-6 text-white">
         <span className="block text-2xl font-extrabold">{es.home.record}</span>

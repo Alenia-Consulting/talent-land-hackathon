@@ -16,7 +16,7 @@ import { ApiError, listPublicGuides, type PublicGuide } from "../../lib/guides.t
 import { es } from "../../lib/i18n/es.ts";
 import { catalogueState, filterCatalogue } from "../../lib/pure/search.ts";
 import { ChevronRightIcon, SearchIcon } from "../icons.tsx";
-import { Button, Card, TopBar } from "../ui.tsx";
+import { BackLink, Button, Card, TopBar } from "../ui.tsx";
 
 const t = es.buscar;
 
@@ -104,10 +104,15 @@ export default function Buscar() {
 
       {/* The box stays at the top edge once the page scrolls: what was typed never leaves. */}
       <TopBar>
-        <label htmlFor="buscar-sitio" className="block text-base font-bold">
-          {t.fieldLabel}
-        </label>
-        <div className="relative mt-1">
+        {/* The way back rides with the search field inside the sticky bar: on a list you scroll,
+            a way out that scrolls away is a way out you have to go looking for. */}
+        <div className="flex items-end gap-3">
+          <BackLink href="/" compact />
+          <div className="min-w-0 flex-1">
+            <label htmlFor="buscar-sitio" className="block text-base font-bold">
+              {t.fieldLabel}
+            </label>
+            <div className="relative mt-1">
           <span aria-hidden="true" className="absolute top-1/2 left-4 -translate-y-1/2 text-tinta/45">
             <SearchIcon size={22} />
           </span>
@@ -118,8 +123,10 @@ export default function Buscar() {
             autoComplete="off"
             placeholder={t.placeholder}
             onChange={(event) => setQuery(event.target.value)}
-            className="w-full rounded-2xl border-2 border-tinta/15 bg-tarjeta py-3 pr-4 pl-12 text-lg text-tinta placeholder:text-tinta/45 focus:border-pino focus:outline-none"
-          />
+                className="w-full rounded-2xl border-2 border-tinta/15 bg-tarjeta py-3 pr-4 pl-12 text-lg text-tinta placeholder:text-tinta/45 focus:border-pino focus:outline-none"
+              />
+            </div>
+          </div>
         </div>
       </TopBar>
 

@@ -7,9 +7,11 @@
 //     is invisible to a part of the people this product is for;
 //   · surfaces are tokens, not literal colours, so dim mode needs no second component.
 
+import Link from "next/link";
 import type { ReactNode } from "react";
 
 import { es } from "../lib/i18n/es.ts";
+import { ChevronLeftIcon } from "./icons.tsx";
 
 export function Card({ children, className = "" }: { children: ReactNode; className?: string }) {
   return <div className={`rounded-3xl bg-tarjeta p-5 ${className}`}>{children}</div>;
@@ -51,6 +53,39 @@ export function TopBar({ children }: { children: ReactNode }) {
     <div className="sticky top-0 z-30 -mx-4 mb-5 border-b border-tinta/10 bg-niebla px-4 py-3">
       {children}
     </div>
+  );
+}
+
+/**
+ * The way out of a screen, as a control on the page and not the browser's back button.
+ *
+ * Every screen below the door carries one, in the same corner. Somebody who arrived by QR has no
+ * history to go back through, and somebody who has never had to find the browser's back button
+ * has no way out at all: the route out of a screen is part of the screen.
+ *
+ * `compact` is the icon-only form, for a header that already holds something else. It is the one
+ * case this design allows an icon with no visible word, and the label is still read aloud.
+ */
+export function BackLink({
+  href,
+  label = es.home.back,
+  compact = false,
+}: {
+  href: string;
+  label?: string;
+  compact?: boolean;
+}) {
+  return (
+    <Link
+      href={href}
+      aria-label={compact ? label : undefined}
+      className={`inline-flex shrink-0 items-center rounded-[18px] bg-tarjeta text-lg font-bold text-tinta ${
+        compact ? "h-14 w-14 justify-center" : "min-h-14 gap-2 pr-5 pl-3"
+      }`}
+    >
+      <ChevronLeftIcon size={24} />
+      {!compact && label}
+    </Link>
   );
 }
 
