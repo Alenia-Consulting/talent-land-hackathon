@@ -238,6 +238,12 @@ def _steps_from_marks(
             "category": mark["category"],
             "start_seconds": mark["marked_at_seconds"],
             "end_seconds": end,
+            # What the person said about the sound; without it the step has no level at all.
+            **(
+                {"noise_level": mark["noise_level"], "noise_level_source": "manual"}
+                if mark.get("noise_level")
+                else {}
+            ),
             # Clamped, because a step can be shorter than the pause itself.
             "photo_second": min(mark["marked_at_seconds"] + PAUSE_SECONDS / 2, end),
         }

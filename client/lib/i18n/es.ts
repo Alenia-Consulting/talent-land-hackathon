@@ -330,7 +330,13 @@ export const es = {
     },
     // The warning before any sound. Invariant 1: nothing plays until this has been answered.
     sound: {
-      title: { quiet: "Este sonido es bajo", medium: "Este sonido es medio", noisy: "Este sonido es alto" },
+      title: {
+        quiet: "Este sonido es bajo",
+        medium: "Este sonido es medio",
+        noisy: "Este sonido es alto",
+        // Sin medida ni respuesta de quien grabó: se dice, no se maquilla de «bajo».
+        unknown: "Este centro no ha dicho cómo suena",
+      },
       subtitle: (parte: string) => `${parte} · sonido del sitio`,
       lead: "Empieza muy bajito y sube poco a poco. Puedes pararlo cuando quieras.",
       headphones: "Si el ruido te molesta, puedes llevar cascos ese día.",

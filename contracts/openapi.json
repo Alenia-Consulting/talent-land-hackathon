@@ -1088,6 +1088,23 @@
             "minimum": 0.0,
             "title": "Marked At Seconds",
             "description": "Second of the video when 'Llegue a: X' was tapped."
+          },
+          "noise_level": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "quiet",
+                  "medium",
+                  "noisy"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Noise Level",
+            "description": "How the place sounded, said by the person who was there. Kept as a human answer: a level measured later never replaces it."
           }
         },
         "type": "object",

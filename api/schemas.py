@@ -53,6 +53,11 @@ class MarkIn(BaseModel):
     category: Category = Field(description="Drives the visitor filters and the pictogram.")
     marked_at_seconds: float = Field(ge=0,
                                      description="Second of the video when 'Llegue a: X' was tapped.")
+    noise_level: NoiseLevel | None = Field(
+        default=None,
+        description="How the place sounded, said by the person who was there. Kept as a human "
+                    "answer: a level measured later never replaces it.",
+    )
 
 
 class GuideCreate(BaseModel):

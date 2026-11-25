@@ -352,3 +352,50 @@ def test_a_route_of_another_guide_is_not_found(client, monkeypatch):
     response = client.delete(f"/guides/{other['id']}/routes/{one['routes'][0]['id']}")
 
     assert response.status_code == 404
+
+
+def test_the_person_recording_can_say_how_it_sounded(client):
+    mark = {"title": "Urgencias", "category": "waiting", "marked_at_seconds": 0.0, "noise_level": "noisy"}
+
+    guide = create_guide(client, marks=[mark]).json()
+
+    step = guide["steps"][0]
+    assert step["noise_level"] == "noisy"
+    assert step["noise_level_source"] == "manual"
+
+
+def test_a_part_without_an_answer_has_no_level(client):
+    mark = {"title": "Urgencias", "category": "waiting", "marked_at_seconds": 0.0}
+
+    step = create_guide(client, marks=[mark]).json()["steps"][0]
+
+    assert step["noise_level"] is None
+    assert step["noise_level_source"] is None
+
+
+def test_a_measured_level_never_overwrites_what_a_person_said(client, monkeypatch, tmp_path):
+    """Whoever stood there knows more than a measurement taken by a microphone."""
+    mark = {"title": "Urgencias", "category": "waiting", "marked_at_seconds": 0.0, "noise_level": "quiet"}
+    guide = create_guide(client, marks=[mark]).json()
+    monkeypatch.setattr("routers.guides.UPLOAD_DIR", tmp_path)
+    monkeypatch.setattr(
+        "media.pipeline.process",
+        lambda video, steps: [
+            pipeline.ProcessedStep(position=1, clip=b"c", photo=b"p", sound=None, noise_level="noisy")
+        ],
+    )
+    monkeypatch.setattr(
+        "media.storage.config_from_env",
+        lambda: storage.StorageConfig(url="https://p.supabase.co", key="k"),
+    )
+    monkeypatch.setattr("media.storage.upload", lambda config, path, *a, **kw: path)
+
+    response = client.post(
+        f"/guides/{guide['id']}/video",
+        files={"video": ("r.mp4", io.BytesIO(b"x"), "video/mp4")},
+    )
+
+    step = response.json()["steps"][0]
+    assert response.status_code == 200, response.text
+    assert step["noise_level"] == "quiet"
+    assert step["noise_level_source"] == "manual"

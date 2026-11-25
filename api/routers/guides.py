@@ -374,7 +374,8 @@ def _ingest(session: Session, guide: Guide, route: Route, video: UploadFile) -> 
             if item.sound is not None:
                 step.sound_path = storage.upload(config, f"{base}.mp3", item.sound, "audio/mpeg")
                 step.sound_available = True
-            if item.noise_level is not None:
+            # Never over what a person said: whoever stood there knows more than a measurement.
+            if item.noise_level is not None and step.noise_level_source != "manual":
                 step.noise_level = item.noise_level
                 step.noise_level_source = "measured"
         _write_texts(by_position, processed, route)

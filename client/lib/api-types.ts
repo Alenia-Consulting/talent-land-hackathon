@@ -480,6 +480,11 @@ export interface components {
              * @description Second of the video when 'Llegue a: X' was tapped.
              */
             marked_at_seconds: number;
+            /**
+             * Noise Level
+             * @description How the place sounded, said by the person who was there. Kept as a human answer: a level measured later never replaces it.
+             */
+            noise_level?: ("quiet" | "medium" | "noisy") | null;
         };
         /**
          * Pending
