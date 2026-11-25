@@ -28,6 +28,19 @@ export const CATALOGUE: readonly Part[] = [
   { title: "Salida", category: "exit" },
 ];
 
+/**
+ * Why this route cannot be recorded yet, or null when it can.
+ *
+ * A reason rather than a sentence, because the screen that asks for the parts and the button in
+ * the footer that is held back by the answer are two different components, and only one of them
+ * shows the words.
+ */
+export function planProblem(venue: string, partCount: number): "venue" | "parts" | null {
+  if (!venue.trim()) return "venue";
+  if (partCount < MIN_MARKS) return "parts";
+  return null;
+}
+
 /** Where in the recording this part was reached. `elapsedMs` is measured from the recorder's t0. */
 export function markAt(part: Part, elapsedMs: number): Mark {
   return {

@@ -3,30 +3,42 @@
 // Before recording, the person says where they are going to walk and what the place is called.
 // Those parts become the "Llegué a: X" buttons during the recording, and the steps of the guide.
 //
-// Light, like every screen of the recorder that is not the camera. It used to be styled for the
-// dark camera screen, which left white text on the pale background: readable to nobody.
-
-import { useState } from "react";
+// Light, like every screen of the recorder that is not the camera.
+//
+// The screen has no button of its own: "Continuar" lives in the recorder's footer, where every
+// other screen keeps its action, so it is on the bottom edge whatever the list of parts does to
+// the height of the page. That is why the plan is held by the page and passed in.
 
 import { es } from "../../lib/i18n/es.ts";
-import { CATALOGUE, MAX_MARKS, MIN_MARKS, type Part } from "../../lib/pure/marks.ts";
+import { CATALOGUE, MAX_MARKS, type Part, planProblem } from "../../lib/pure/marks.ts";
 import { CloseIcon, PlusIcon } from "../icons.tsx";
-import { ActionButton } from "./screens.tsx";
 
 export type Plan = { title: string; venue: string; parts: Part[] };
 
 const t = es.partes;
 
+export const EMPTY_PLAN: Plan = { title: t.guideTitlePlaceholder, venue: "", parts: [] };
+
+/** What is still stopping this route from being recorded, in words, or null. */
+export function planWarning(plan: Plan): string | null {
+  const problem = planProblem(plan.venue, plan.parts.length);
+  if (problem === "venue") return t.needVenue;
+  if (problem === "parts") return t.needTwo;
+  return null;
+}
+
 const inputClass =
   "mt-1 w-full rounded-2xl border-2 border-tinta/15 bg-tarjeta px-4 py-3 text-lg text-tinta placeholder:text-tinta/45 focus:border-pino focus:outline-none";
 
-export function PartsScreen({ onReady }: { onReady: (plan: Plan) => void }) {
-  const [title, setTitle] = useState<string>(t.guideTitlePlaceholder);
-  const [venue, setVenue] = useState("");
-  const [parts, setParts] = useState<Part[]>([]);
-
-  const problem = !venue.trim() ? t.needVenue : parts.length < MIN_MARKS ? t.needTwo : null;
-  const full = parts.length >= MAX_MARKS;
+export function PartsScreen({
+  plan,
+  onChange,
+}: {
+  plan: Plan;
+  onChange: (next: Plan) => void;
+}) {
+  const warning = planWarning(plan);
+  const full = plan.parts.length >= MAX_MARKS;
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto p-6">
@@ -41,11 +53,11 @@ export function PartsScreen({ onReady }: { onReady: (plan: Plan) => void }) {
         </label>
         <input
           id="venue-name"
-          value={venue}
+          value={plan.venue}
           maxLength={200}
           placeholder={t.venuePlaceholder}
           className={inputClass}
-          onChange={(event) => setVenue(event.target.value)}
+          onChange={(event) => onChange({ ...plan, venue: event.target.value })}
         />
       </p>
 
@@ -55,10 +67,10 @@ export function PartsScreen({ onReady }: { onReady: (plan: Plan) => void }) {
         </label>
         <input
           id="guide-title"
-          value={title}
+          value={plan.title}
           maxLength={120}
           className={inputClass}
-          onChange={(event) => setTitle(event.target.value)}
+          onChange={(event) => onChange({ ...plan, title: event.target.value })}
         />
       </p>
 
@@ -70,7 +82,7 @@ export function PartsScreen({ onReady }: { onReady: (plan: Plan) => void }) {
               <button
                 type="button"
                 disabled={full}
-                onClick={() => setParts([...parts, part])}
+                onClick={() => onChange({ ...plan, parts: [...plan.parts, part] })}
                 className="inline-flex min-h-12 items-center gap-2 rounded-[18px] border-2 border-pino/35 bg-tarjeta px-4 text-lg font-bold text-pino disabled:opacity-40"
               >
                 <PlusIcon size={20} />
@@ -83,13 +95,13 @@ export function PartsScreen({ onReady }: { onReady: (plan: Plan) => void }) {
 
       <div>
         <h2 className="font-bold">{t.chosen}</h2>
-        {parts.length === 0 ? (
+        {plan.parts.length === 0 ? (
           <p className="mt-2 text-tinta/60">{t.empty}</p>
         ) : (
           // Numbered the way they will be walked, because the order is the recording order and a
           // mistake here is a mistake the person only notices with the camera already open.
           <ol className="mt-2 flex flex-wrap gap-2">
-            {parts.map((part, index) => (
+            {plan.parts.map((part, index) => (
               <li
                 key={`${part.category}-${index}`}
                 className="inline-flex min-h-12 items-center gap-2 rounded-[18px] bg-salvia pr-2 pl-4 text-lg font-bold text-pino"
@@ -100,7 +112,9 @@ export function PartsScreen({ onReady }: { onReady: (plan: Plan) => void }) {
                 <button
                   type="button"
                   aria-label={`${t.remove} ${part.title}`}
-                  onClick={() => setParts(parts.filter((_, i) => i !== index))}
+                  onClick={() =>
+                    onChange({ ...plan, parts: plan.parts.filter((_, i) => i !== index) })
+                  }
                   className="inline-flex h-9 w-9 items-center justify-center rounded-xl text-pino"
                 >
                   <CloseIcon size={20} />
@@ -111,22 +125,11 @@ export function PartsScreen({ onReady }: { onReady: (plan: Plan) => void }) {
         )}
       </div>
 
-      {problem && (
+      {warning && (
         <p role="alert" className="rounded-2xl bg-ambar/35 p-4 text-sobre-ambar">
-          {problem}
+          {warning}
         </p>
       )}
-
-      {/* Wrapped, because the button grows along the flex axis and this column is vertical: on its
-          own it stretched to fill whatever space the chips left. */}
-      <div className="flex">
-        <ActionButton
-          disabled={problem !== null}
-          onClick={() => onReady({ title: title.trim(), venue: venue.trim(), parts })}
-        >
-          {t.next}
-        </ActionButton>
-      </div>
     </div>
   );
 }

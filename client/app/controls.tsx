@@ -167,7 +167,9 @@ export function Sheet({
         aria-modal="true"
         aria-label={title}
         tabIndex={-1}
-        className="relative w-full max-w-2xl rounded-t-3xl bg-niebla p-6 pb-10"
+        // Taller than the screen on a phone, so it scrolls inside itself. Without the cap the
+        // top of the sheet — its title — was simply cut off above the viewport.
+        className="relative max-h-[92dvh] w-full max-w-2xl overflow-y-auto rounded-t-3xl bg-niebla p-6 pb-10"
       >
         <span aria-hidden="true" className="mx-auto mb-5 block h-1.5 w-16 rounded-full bg-tinta/20" />
         {children}

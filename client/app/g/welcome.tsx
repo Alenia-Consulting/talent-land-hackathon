@@ -26,7 +26,7 @@ import {
   VolumeIcon,
 } from "../icons.tsx";
 import { usePrefs } from "../prefs.tsx";
-import { Button, Card } from "../ui.tsx";
+import { ActionBar, Button, Card } from "../ui.tsx";
 import { SettingsControls } from "./settings.tsx";
 
 const t = es.bienvenida;
@@ -197,7 +197,7 @@ export function Welcome({ onDone }: { onDone: () => void }) {
   };
 
   return (
-    <div className="flex min-h-[calc(100dvh-3rem)] flex-col">
+    <div className="flex min-h-[calc(100dvh-1.5rem)] flex-col">
       <header className="mb-6 flex items-center justify-between gap-4">
         {slide === 0 ? (
           <button
@@ -252,14 +252,13 @@ export function Welcome({ onDone }: { onDone: () => void }) {
         )}
       </div>
 
-      <div className="mt-8">
+      {/* The same place on all three slides, and on the bottom edge: the list of needs is long
+          enough to push a button off a phone screen. */}
+      <ActionBar note={slide === 0 ? t.welcome.free : undefined}>
         {slide === 0 && (
-          <>
-            <Button full onClick={() => setSlide(1)}>
-              {t.welcome.start}
-            </Button>
-            <p className="mt-3 text-center text-base text-tinta/60">{t.welcome.free}</p>
-          </>
+          <Button full onClick={() => setSlide(1)}>
+            {t.welcome.start}
+          </Button>
         )}
         {slide === 1 && (
           <Button full onClick={applyAndAdvance}>
@@ -271,7 +270,7 @@ export function Welcome({ onDone }: { onDone: () => void }) {
             {t.ready.start}
           </Button>
         )}
-      </div>
+      </ActionBar>
     </div>
   );
 }

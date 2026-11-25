@@ -13,7 +13,7 @@ import { es } from "../../lib/i18n/es.ts";
 import { ThemeButton, Toggle } from "../controls.tsx";
 import { AntesalaMark, PlayIcon, WaveIcon } from "../icons.tsx";
 import { usePrefs } from "../prefs.tsx";
-import { Button, Card, Chip, Pill } from "../ui.tsx";
+import { ActionBar, Button, Card, Chip, Pill } from "../ui.tsx";
 import { SettingsSheet } from "./settings.tsx";
 
 const t = es.publica;
@@ -60,7 +60,7 @@ export function Landing({
   const interests = availableInterests(guide);
 
   return (
-    <>
+    <div className="flex min-h-[calc(100dvh-1.5rem)] flex-col">
       <header className="mb-6 flex items-center justify-between gap-4">
         <span className="inline-flex items-center gap-3 text-2xl font-extrabold">
           <span className="text-pino">
@@ -80,64 +80,68 @@ export function Landing({
         </span>
       </header>
 
-      {guide.cover_photo_url && (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={guide.cover_photo_url}
-          alt=""
-          className="mb-5 aspect-[4/3] w-full rounded-3xl object-cover"
-        />
-      )}
+      <div className="flex-1">
+        {guide.cover_photo_url && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={guide.cover_photo_url}
+            alt=""
+            className="mb-5 aspect-[4/3] w-full rounded-3xl object-cover"
+          />
+        )}
 
-      <h1 className="text-4xl font-extrabold">{guide.venue_name}</h1>
-      <p className="mt-1 text-xl text-tinta/70">{guide.title}</p>
+        <h1 className="text-4xl font-extrabold">{guide.venue_name}</h1>
+        <p className="mt-1 text-xl text-tinta/70">{guide.title}</p>
 
-      <div className="mt-4 flex flex-wrap gap-3">
-        <Pill>{t.stepCount(guide.steps.length)}</Pill>
-        {guide.walking_minutes != null && <Pill>{`${guide.walking_minutes} min andando`}</Pill>}
-        {reviewed && <Pill>{reviewed}</Pill>}
+        <div className="mt-4 flex flex-wrap gap-3">
+          <Pill>{t.stepCount(guide.steps.length)}</Pill>
+          {guide.walking_minutes != null && <Pill>{`${guide.walking_minutes} min andando`}</Pill>}
+          {reviewed && <Pill>{reviewed}</Pill>}
+        </div>
+
+        {interests.length > 0 && (
+          <section className="mt-8">
+            <h2 className="text-2xl font-extrabold">{t.pickTitle}</h2>
+            <p className="mt-1 text-tinta/70">{t.pickLead}</p>
+            <div className="mt-4 flex flex-wrap gap-3">
+              {interests.map((interest) => (
+                <Chip
+                  key={interest}
+                  selected={chosen.has(interest)}
+                  onClick={() => onToggle(interest)}
+                >
+                  {t.interests[interest]}
+                </Chip>
+              ))}
+            </div>
+          </section>
+        )}
+
+        <Card className="mt-8 flex items-center gap-4">
+          <span className="text-pino">
+            <WaveIcon size={28} />
+          </span>
+          <Toggle
+            label={t.readAloud}
+            hint={t.readAloudHint}
+            checked={prefs.readAloud}
+            onChange={(next) => setPrefs({ readAloud: next })}
+          />
+        </Card>
       </div>
 
-      {interests.length > 0 && (
-        <section className="mt-8">
-          <h2 className="text-2xl font-extrabold">{t.pickTitle}</h2>
-          <p className="mt-1 text-tinta/70">{t.pickLead}</p>
-          <div className="mt-4 flex flex-wrap gap-3">
-            {interests.map((interest) => (
-              <Chip
-                key={interest}
-                selected={chosen.has(interest)}
-                onClick={() => onToggle(interest)}
-              >
-                {t.interests[interest]}
-              </Chip>
-            ))}
-          </div>
-        </section>
-      )}
-
-      <Card className="mt-8 flex items-center gap-4">
-        <span className="text-pino">
-          <WaveIcon size={28} />
-        </span>
-        <Toggle
-          label={t.readAloud}
-          hint={t.readAloudHint}
-          checked={prefs.readAloud}
-          onChange={(next) => setPrefs({ readAloud: next })}
-        />
-      </Card>
-
-      <div className="mt-6 grid gap-3">
+      {/* Pinned to the bottom edge: the way into the guide is never below the fold, however many
+          interests this place has to offer. */}
+      <ActionBar>
         <Button full icon={<PlayIcon size={22} />} onClick={onStart}>
           {t.start}
         </Button>
         <Button full variant="secondary" onClick={onSeeAll}>
           {t.seeAll}
         </Button>
-      </div>
+      </ActionBar>
 
       <SettingsSheet open={settingsOpen} onClose={() => setSettingsOpen(false)} />
-    </>
+    </div>
   );
 }

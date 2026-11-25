@@ -23,7 +23,7 @@ import {
   StepRail,
   WarningStack,
 } from "./overlays.tsx";
-import { PartsScreen, type Plan } from "./parts.tsx";
+import { EMPTY_PLAN, PartsScreen, type Plan, planWarning } from "./parts.tsx";
 import {
   ActionButton,
   DoneScreen,
@@ -51,6 +51,8 @@ export default function GrabarPage() {
   const [debug, setDebug] = useState(false);
   const [resumed, setResumed] = useState(false);
   const [plan, setPlan] = useState<Plan | null>(null);
+  // The parts screen is a form the footer button acts on, so the page holds what it is typing.
+  const [draft, setDraft] = useState<Plan>(EMPTY_PLAN);
   const [marks, setMarks] = useState<Mark[]>([]);
   const [guideId, setGuideId] = useState<string | null>(null);
   const [videoSent, setVideoSent] = useState(false);
@@ -208,14 +210,7 @@ export default function GrabarPage() {
 
   const body = {
     intro: <IntroScreen />,
-    partes: (
-      <PartsScreen
-        onReady={(chosen) => {
-          setPlan(chosen);
-          setPhase("permisos");
-        }}
-      />
-    ),
+    partes: <PartsScreen plan={draft} onChange={setDraft} />,
     permisos: <PermissionScreen starting={camera.status === "starting"} resumed={resumed} />,
     revision: recorder.result && (
       <ReviewScreen
@@ -232,7 +227,17 @@ export default function GrabarPage() {
 
   const actions = {
     intro: <ActionButton onClick={() => setPhase("partes")}>{es.intro.next}</ActionButton>,
-    partes: null,
+    partes: (
+      <ActionButton
+        disabled={planWarning(draft) !== null}
+        onClick={() => {
+          setPlan({ ...draft, title: draft.title.trim(), venue: draft.venue.trim() });
+          setPhase("permisos");
+        }}
+      >
+        {es.partes.next}
+      </ActionButton>
+    ),
     permisos: (
       <ActionButton onClick={openCamera} disabled={camera.status === "starting"}>
         {es.permisos.action}

@@ -262,7 +262,7 @@ export function Player({
   const last = index === steps.length - 1;
 
   return (
-    <div className="flex min-h-[calc(100dvh-3rem)] flex-col">
+    <div className="flex min-h-[calc(100dvh-1.5rem)] flex-col">
       <header className="flex items-center gap-4">
         <HeaderButton label={t.player.close} onClick={onClose}>
           <CloseIcon />

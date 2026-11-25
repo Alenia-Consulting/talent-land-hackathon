@@ -13,7 +13,7 @@ import { Suspense, useEffect, useMemo, useState } from "react";
 import { ApiError, type Guide, readPublicGuide } from "../../lib/guides.ts";
 import { es } from "../../lib/i18n/es.ts";
 import { ChevronLeftIcon } from "../icons.tsx";
-import { Button, Card, NoiseLevel } from "../ui.tsx";
+import { ActionBar, Button, Card, NoiseLevel } from "../ui.tsx";
 import { usePrefs } from "../prefs.tsx";
 import { Landing } from "./landing.tsx";
 import { Player } from "./player.tsx";
@@ -37,60 +37,69 @@ function reviewedOn(iso: string | null | undefined): string | null {
 /** The whole route on one page, for someone who prefers scrolling to tapping. */
 function FullRoute({ guide, onBack }: { guide: Guide; onBack: () => void }) {
   return (
-    <>
-      <header className="mb-6 flex items-center gap-4">
-        <Button variant="quiet" icon={<ChevronLeftIcon size={22} />} onClick={onBack}>
-          {t.player.previous}
-        </Button>
-      </header>
-      <h1 className="text-3xl font-extrabold">{guide.venue_name}</h1>
+    <div className="flex min-h-[calc(100dvh-1.5rem)] flex-col">
+      <div className="flex-1">
+        <h1 className="text-3xl font-extrabold">{guide.venue_name}</h1>
 
-      <ol className="mt-6 grid gap-4">
-        {guide.steps.map((step) => (
-          <li key={step.id}>
-            <Card>
-              <div className="flex items-start gap-4">
-                <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-salvia text-2xl font-extrabold text-pino">
-                  {step.order}
-                </span>
-                <div className="min-w-0 flex-1">
-                  <h2 className="text-2xl font-extrabold">{step.title}</h2>
-                  {step.photo_url ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={step.photo_url} alt="" className="mt-3 w-full rounded-2xl" />
-                  ) : (
-                    <p className="mt-2 rounded-2xl bg-niebla p-3 text-base text-tinta/55">
-                      {t.noMedia}
-                    </p>
-                  )}
-                  {step.easy_read_text && <p className="mt-3">{step.easy_read_text}</p>}
-                  {step.noise_level && (
-                    <p className="mt-3">
-                      <NoiseLevel
-                        level={step.noise_level}
-                        label={t.noise[step.noise_level as keyof typeof t.noise] ?? step.noise_level}
+        <ol className="mt-6 grid gap-4">
+          {guide.steps.map((step) => (
+            <li key={step.id}>
+              <Card>
+                <div className="flex items-start gap-4">
+                  <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-salvia text-2xl font-extrabold text-pino">
+                    {step.order}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <h2 className="text-2xl font-extrabold">{step.title}</h2>
+                    {step.photo_url ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={step.photo_url}
+                        alt=""
+                        className="mt-3 aspect-[4/3] w-full rounded-2xl bg-salvia object-cover"
                       />
-                    </p>
-                  )}
-                  {step.what_to_expect.length > 0 && (
-                    <ul className="mt-3 list-disc pl-6">
-                      {step.what_to_expect.map((item) => (
-                        <li key={item}>{item}</li>
-                      ))}
-                    </ul>
-                  )}
-                  {step.who_to_ask_for_help && (
-                    <p className="mt-4 rounded-2xl bg-salvia p-4">
-                      <span className="font-bold">{t.whoToAsk}:</span> {step.who_to_ask_for_help}
-                    </p>
-                  )}
+                    ) : (
+                      <p className="mt-2 rounded-2xl bg-niebla p-3 text-base text-tinta/55">
+                        {t.noMedia}
+                      </p>
+                    )}
+                    {step.easy_read_text && <p className="mt-3">{step.easy_read_text}</p>}
+                    {step.noise_level && (
+                      <p className="mt-3">
+                        <NoiseLevel
+                          level={step.noise_level}
+                          label={t.noise[step.noise_level as keyof typeof t.noise] ?? step.noise_level}
+                        />
+                      </p>
+                    )}
+                    {step.what_to_expect.length > 0 && (
+                      <ul className="mt-3 list-disc pl-6">
+                        {step.what_to_expect.map((item) => (
+                          <li key={item}>{item}</li>
+                        ))}
+                      </ul>
+                    )}
+                    {step.who_to_ask_for_help && (
+                      <p className="mt-4 rounded-2xl bg-salvia p-4">
+                        <span className="font-bold">{t.whoToAsk}:</span> {step.who_to_ask_for_help}
+                      </p>
+                    )}
+                  </div>
                 </div>
-              </div>
-            </Card>
-          </li>
-        ))}
-      </ol>
-    </>
+              </Card>
+            </li>
+          ))}
+        </ol>
+      </div>
+
+      {/* This page is as long as the route. The way back belongs on the bottom edge, not at the
+          top of a list somebody has just scrolled to the end of. */}
+      <ActionBar>
+        <Button full variant="secondary" icon={<ChevronLeftIcon size={22} />} onClick={onBack}>
+          {t.back}
+        </Button>
+      </ActionBar>
+    </div>
   );
 }
 
@@ -175,7 +184,7 @@ function PublicGuide() {
 
 export default function PublicGuidePage() {
   return (
-    <main className="mx-auto min-h-dvh max-w-2xl px-4 py-6">
+    <main className="mx-auto min-h-dvh max-w-2xl px-4 pt-6">
       <Suspense fallback={<p className="text-tinta/70">{t.loading}</p>}>
         <PublicGuide />
       </Suspense>
