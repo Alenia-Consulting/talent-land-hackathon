@@ -110,3 +110,12 @@ test("network errors and timeouts have status 0", async () => {
     assert.match(error.message, message);
   }
 });
+
+test("a video for a route goes to that route's endpoint", async () => {
+  const xhr = fakeXhr((x) => {
+    x.status = 200;
+    x.onload?.();
+  });
+  await uploadVideo("g1", input, () => {}, () => xhr as unknown as XMLHttpRequest, "r1");
+  assert.deepEqual(xhr.opened, ["POST", "/api/guides/g1/routes/r1/video"]);
+});

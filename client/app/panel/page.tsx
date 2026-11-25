@@ -10,10 +10,10 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
-import { ApiError, type GuideSummary, listGuides } from "../../lib/guides.ts";
+import { ApiError, deleteGuide, type GuideSummary, listGuides } from "../../lib/guides.ts";
 import { es } from "../../lib/i18n/es.ts";
 import { AntesalaMark, ChevronRightIcon, SearchIcon, VideoIcon } from "../icons.tsx";
-import { Card, StatusChip } from "../ui.tsx";
+import { Button, Card, StatusChip } from "../ui.tsx";
 
 const t = es.panel;
 
@@ -114,11 +114,44 @@ function Toolbar({
   );
 }
 
+/**
+ * Asked in the row itself instead of a browser dialog: it is irreversible, so it says what goes
+ * with the guide, and the safe answer is the first button. No red: coral is reserved for recording.
+ */
+function ConfirmDelete({
+  guide,
+  busy,
+  onCancel,
+  onConfirm,
+}: {
+  guide: GuideSummary;
+  busy: boolean;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  return (
+    <div role="alertdialog" aria-label={t.delete.title(guide.title)} className="px-1 py-4">
+      <p className="text-xl font-bold">{t.delete.title(guide.title)}</p>
+      <p className="mt-1 text-tinta/70">{t.delete.lead}</p>
+      <div className="mt-3 flex flex-wrap gap-3">
+        <Button variant="secondary" onClick={onCancel} disabled={busy}>
+          {t.delete.cancel}
+        </Button>
+        <Button variant="dark" onClick={onConfirm} disabled={busy}>
+          {busy ? t.delete.deleting : t.delete.confirm}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 export default function PanelPage() {
   const [guides, setGuides] = useState<GuideSummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<Filter>("all");
+  const [confirming, setConfirming] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     listGuides()
@@ -127,6 +160,20 @@ export default function PanelPage() {
         setError(cause instanceof ApiError ? cause.message : String(cause));
       });
   }, []);
+
+  const remove = (id: string) => {
+    setDeleting(true);
+    setError(null);
+    deleteGuide(id)
+      .then(() => setGuides((now) => (now ? now.filter((guide) => guide.id !== id) : now)))
+      .catch((cause: unknown) => {
+        setError(cause instanceof ApiError ? cause.message : String(cause));
+      })
+      .finally(() => {
+        setDeleting(false);
+        setConfirming(null);
+      });
+  };
 
   const counts = useMemo(
     () => ({
@@ -215,31 +262,50 @@ export default function PanelPage() {
                   key={guide.id}
                   className={`min-w-0 ${index > 0 ? "border-t border-tinta/10" : ""}`}
                 >
-                  {/* Two lines, whatever the width: wrapping turned one guide into four rows on
-                      a phone, and a list you cannot run your eye down is not a list. */}
-                  <Link
-                    href={`/panel/guia?id=${guide.id}`}
-                    className="flex items-center gap-4 px-1 py-4"
-                  >
-                    <Thumbnail guide={guide} />
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-xl font-bold">{guide.title}</span>
-                      {/* The state sits under the title rather than beside it: on the right it
-                          was a fixed column that left the titles a dozen characters wide. */}
-                      <span className="flex min-w-0 items-center gap-2">
-                        <StatusChip status={guide.status} />
-                        <span className="truncate text-base text-tinta/60">
-                          {guide.venue_name} · {t.lastReview}: {reviewedLabel(guide.reviewed_at)}
+                  {confirming === guide.id ? (
+                    <ConfirmDelete
+                      guide={guide}
+                      busy={deleting}
+                      onCancel={() => setConfirming(null)}
+                      onConfirm={() => remove(guide.id)}
+                    />
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      {/* Two lines, whatever the width: wrapping turned one guide into four rows on
+                          a phone, and a list you cannot run your eye down is not a list. */}
+                      <Link
+                        href={`/panel/guia?id=${guide.id}`}
+                        className="flex items-center gap-4 px-1 py-4"
+                      >
+                        <Thumbnail guide={guide} />
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-xl font-bold">{guide.title}</span>
+                          {/* The state sits under the title rather than beside it: on the right it
+                              was a fixed column that left the titles a dozen characters wide. */}
+                          <span className="flex min-w-0 items-center gap-2">
+                            <StatusChip status={guide.status} />
+                            <span className="truncate text-base text-tinta/60">
+                              {guide.venue_name} · {t.lastReview}: {reviewedLabel(guide.reviewed_at)}
+                            </span>
+                          </span>
                         </span>
-                      </span>
-                    </span>
-                    <span className="hidden font-bold text-pino underline sm:inline">
-                      {isPending(guide) ? t.review : t.edit}
-                    </span>
-                    <span aria-hidden="true" className="text-pino">
-                      <ChevronRightIcon size={22} />
-                    </span>
-                  </Link>
+                        <span className="hidden font-bold text-pino underline sm:inline">
+                          {isPending(guide) ? t.review : t.edit}
+                        </span>
+                        <span aria-hidden="true" className="text-pino">
+                          <ChevronRightIcon size={22} />
+                        </span>
+                      </Link>
+                      <button
+                        type="button"
+                        onClick={() => setConfirming(guide.id)}
+                        aria-label={`${t.delete.action} ${guide.title}`}
+                        className="min-h-12 shrink-0 rounded-[18px] px-4 text-base font-bold text-tinta/70 underline"
+                      >
+                        {t.delete.action}
+                      </button>
+                    </div>
+                  )}
                 </li>
               ))}
             </ul>

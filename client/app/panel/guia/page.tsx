@@ -13,12 +13,12 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { Fragment, Suspense, useCallback, useEffect, useRef, useState } from "react";
 
 import { es } from "../../../lib/i18n/es.ts";
 import { draftOf, missingInDraft, reviewStateOf } from "../../../lib/pure/draft.ts";
 import { ProgressSegments } from "../../controls.tsx";
-import { AlertIcon, CheckIcon, ChevronLeftIcon, QrIcon } from "../../icons.tsx";
+import { AlertIcon, CheckIcon, ChevronLeftIcon, PlusIcon, QrIcon } from "../../icons.tsx";
 import { ActionBar, Button, Card, StatusChip, TopBar } from "../../ui.tsx";
 import { ShareSheet } from "./share.tsx";
 import { anchorOf, focusBlank, SaveStatus, StepForm } from "./step-form.tsx";
@@ -184,19 +184,34 @@ function GuideDetail() {
           </p>
         )}
 
+        {/* Several recordings: say which one each group of steps comes from, and offer another. */}
         <ol className="grid gap-3">
-          {guide.steps.map((step) => (
-            <StepForm
-              key={step.id}
-              step={step}
-              draft={drafts[step.id] ?? draftOf(step)}
-              open={open === step.id}
-              onOpen={() => goTo(step.id)}
-              onEdit={(patch) => review.edit(step.id, patch)}
-              onSave={() => review.save(step.id)}
-            />
+          {guide.steps.map((step, index) => (
+            <Fragment key={step.id}>
+              {guide.routes.length > 1 && step.route_id !== guide.steps[index - 1]?.route_id && (
+                <li aria-hidden="true" className="mt-2 text-base font-bold text-pino">
+                  {guide.routes.find((route) => route.id === step.route_id)?.title}
+                </li>
+              )}
+              <StepForm
+                step={step}
+                draft={drafts[step.id] ?? draftOf(step)}
+                open={open === step.id}
+                onOpen={() => goTo(step.id)}
+                onEdit={(patch) => review.edit(step.id, patch)}
+                onSave={() => review.save(step.id)}
+              />
+            </Fragment>
           ))}
         </ol>
+
+        <Link
+          href={`/grabar?guia=${guide.id}`}
+          className="mt-4 inline-flex min-h-14 items-center gap-3 rounded-[18px] border-2 border-pino bg-tarjeta px-6 text-lg font-bold text-pino"
+        >
+          <PlusIcon size={22} />
+          {t.addRoute}
+        </Link>
 
         <Guarantees hasMedia={guide.steps.some((step) => step.clip_url)} />
       </div>

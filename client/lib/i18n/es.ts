@@ -117,6 +117,7 @@ export const es = {
   },
   debug: { title: "Depuración" },
   partes: {
+    addingTo: (centro: string) => `Vas a añadir un recorrido a ${centro}.`,
     title: "¿Qué partes vas a grabar?",
     lead: "Elige las partes por las que vas a pasar, en orden. Durante la grabación pulsarás «Llegué a» cuando llegues a cada una.",
     guideTitle: "Nombre del recorrido",
@@ -166,7 +167,18 @@ export const es = {
     review: "Revisar",
     edit: "Editar",
     statuses: { draft: "Borrador", needs_review: "Por revisar", published: "Publicada" },
+    // Borrar es para siempre: la pregunta lo dice con esas palabras y dice qué más se va.
+    delete: {
+      action: "Borrar",
+      title: (guia: string) => `¿Borrar «${guia}» para siempre?`,
+      lead: "Se borran también sus vídeos y fotos, aunque esté publicada. No se puede deshacer.",
+      cancel: "Cancelar",
+      confirm: "Borrar para siempre",
+      deleting: "Borrando…",
+    },
     detail: {
+      routes: "Recorridos",
+      addRoute: "Añadir un recorrido",
       back: "Volver a las guías",
       reviewed: "Revisado",
       publish: "Aprobar y publicar",
@@ -235,6 +247,8 @@ export const es = {
     },
   },
   publica: {
+    routes: "Recorridos",
+    allRoutes: "Todos",
     loading: "Cargando la guía…",
     notFound: "No encontramos esta guía. Puede que el enlace sea incorrecto.",
     reviewedAt: (fecha: string) => `Revisada el ${fecha}`,

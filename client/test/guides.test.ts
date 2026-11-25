@@ -2,8 +2,10 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import {
+  addRoute,
   ApiError,
   createGuide,
+  deleteGuide,
   listGuides,
   patchStep,
   publishGuide,
@@ -154,4 +156,39 @@ test("readPublicGuide asks the public endpoint", async () => {
 
   assert.equal(calls[0].url, "/api/public/centro-oeste");
   assert.equal(calls[0].method, "GET");
+});
+
+test("addRoute posts the marks to the guide's routes", async () => {
+  const { calls, fetchImpl } = spy(201, { id: "abc", routes: [], steps: [] });
+
+  await addRoute(
+    "abc",
+    { title: "Rayos X", video_duration_seconds: 30, marks: MARKS },
+    fetchImpl,
+  );
+
+  assert.equal(calls[0].method, "POST");
+  assert.ok(calls[0].url.endsWith("/guides/abc/routes"));
+  assert.equal((calls[0].body as { title: string }).title, "Rayos X");
+});
+
+test("deleteGuide sends DELETE and accepts an empty answer", async () => {
+  const calls: { url: string; method: string }[] = [];
+  const fetchImpl: typeof fetch = async (url, init) => {
+    calls.push({ url: String(url), method: init?.method ?? "GET" });
+    return new Response(null, { status: 204 });
+  };
+
+  await deleteGuide("abc", fetchImpl);
+
+  assert.equal(calls[0].method, "DELETE");
+  assert.ok(calls[0].url.endsWith("/guides/abc"));
+});
+
+test("deleteGuide reports why storage refused", async () => {
+  const { fetchImpl } = spy(502, { detail: "storage refused the deletion: HTTP 500" });
+
+  await assert.rejects(deleteGuide("abc", fetchImpl), (error: unknown) => {
+    return error instanceof ApiError && error.status === 502 && /storage/.test(error.message);
+  });
 });

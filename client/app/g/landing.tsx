@@ -12,6 +12,7 @@ import type { Guide } from "../../lib/guides.ts";
 import { es } from "../../lib/i18n/es.ts";
 import { ThemeButton, Toggle } from "../controls.tsx";
 import { AntesalaMark, PlayIcon, WaveIcon } from "../icons.tsx";
+import { hasSeveralRoutes } from "../../lib/pure/routes.ts";
 import { usePrefs } from "../prefs.tsx";
 import { ActionBar, Button, Card, Chip, Pill } from "../ui.tsx";
 import { SettingsSheet } from "./settings.tsx";
@@ -45,10 +46,15 @@ export function Landing({
   reviewed,
   chosen,
   onToggle,
+  routeId,
+  onRoute,
   onStart,
   onSeeAll,
 }: {
   guide: Guide;
+  /** The recording being looked at; null is all of them. */
+  routeId: string | null;
+  onRoute: (id: string | null) => void;
   reviewed: string | null;
   chosen: ReadonlySet<string>;
   onToggle: (interest: string) => void;
@@ -98,6 +104,22 @@ export function Landing({
           {guide.walking_minutes != null && <Pill>{`${guide.walking_minutes} min andando`}</Pill>}
           {reviewed && <Pill>{reviewed}</Pill>}
         </div>
+
+        {hasSeveralRoutes(guide) && (
+          <section className="mt-8">
+            <h2 className="text-2xl font-extrabold">{t.routes}</h2>
+            <div className="mt-4 flex flex-wrap gap-3">
+              <Chip selected={routeId === null} onClick={() => onRoute(null)}>
+                {t.allRoutes}
+              </Chip>
+              {guide.routes.map((route) => (
+                <Chip key={route.id} selected={routeId === route.id} onClick={() => onRoute(route.id)}>
+                  {route.title}
+                </Chip>
+              ))}
+            </div>
+          </section>
+        )}
 
         {interests.length > 0 && (
           <section className="mt-8">

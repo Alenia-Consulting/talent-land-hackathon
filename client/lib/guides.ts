@@ -13,6 +13,8 @@ export type Step = components["schemas"]["StepOut"];
 export type Mark = components["schemas"]["MarkIn"];
 export type GuideCreate = components["schemas"]["GuideCreate"];
 export type StepPatch = components["schemas"]["StepPatch"];
+export type Route = components["schemas"]["RouteOut"];
+export type RouteCreate = components["schemas"]["RouteCreate"];
 export type Pending = components["schemas"]["Pending"];
 export type Category = Mark["category"];
 // Derived from StepPatch, not StepOut: the API declares the response field as a plain string,
@@ -88,6 +90,27 @@ export function createGuide(body: NewGuide, fetchImpl?: typeof fetch): Promise<G
     { method: "POST", body: JSON.stringify({ language: "es", ...body }) },
     fetchImpl,
   );
+}
+
+/** POST /guides/{id}/routes — another recording for a guide that exists. The guide comes back. */
+export function addRoute(
+  guideId: string,
+  body: RouteCreate,
+  fetchImpl?: typeof fetch,
+): Promise<Guide> {
+  return request<Guide>(
+    `/guides/${guideId}/routes`,
+    { method: "POST", body: JSON.stringify(body) },
+    fetchImpl,
+  );
+}
+
+/**
+ * DELETE /guides/{id} — the guide, its steps and its files in storage, published or not.
+ * It cannot be undone: callers ask the person first.
+ */
+export async function deleteGuide(id: string, fetchImpl?: typeof fetch): Promise<void> {
+  await request<null>(`/guides/${id}`, { method: "DELETE" }, fetchImpl);
 }
 
 /** GET /guides — one page for the review panel, most recent first, without steps. */

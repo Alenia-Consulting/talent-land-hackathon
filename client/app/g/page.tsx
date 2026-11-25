@@ -12,6 +12,7 @@ import { Suspense, useEffect, useMemo, useState } from "react";
 
 import { ApiError, type Guide, readPublicGuide } from "../../lib/guides.ts";
 import { es } from "../../lib/i18n/es.ts";
+import { scopedToRoute } from "../../lib/pure/routes.ts";
 import { ChevronLeftIcon } from "../icons.tsx";
 import { ActionBar, Button, Card, NoiseLevel } from "../ui.tsx";
 import { usePrefs } from "../prefs.tsx";
@@ -109,6 +110,7 @@ function PublicGuide() {
   const [error, setError] = useState<string | null>(null);
   const [view, setView] = useState<View>({ name: "landing" });
   const [chosen, setChosen] = useState<ReadonlySet<string>>(new Set());
+  const [routeId, setRouteId] = useState<string | null>(null);
   const { prefs, ready } = usePrefs();
   // Held separately from the stored flag so that finishing the welcome does not wait on a write
   // to storage a private window may refuse.
@@ -129,14 +131,17 @@ function PublicGuide() {
    * Choosing interests narrows the route; choosing none shows all of it. A selection that
    * matched nothing would leave an empty player, so it falls back to the whole route.
    */
+  // What the visitor is looking at: the whole guide, or one of its recordings.
+  const scoped = useMemo(() => (guide ? scopedToRoute(guide, routeId) : null), [guide, routeId]);
+
   const steps = useMemo(() => {
-    if (!guide) return [];
-    if (chosen.size === 0) return guide.steps;
-    const picked = guide.steps.filter((step) =>
+    if (!scoped) return [];
+    if (chosen.size === 0) return scoped.steps;
+    const picked = scoped.steps.filter((step) =>
       step.interests.some((interest) => chosen.has(interest)),
     );
-    return picked.length > 0 ? picked : guide.steps;
-  }, [guide, chosen]);
+    return picked.length > 0 ? picked : scoped.steps;
+  }, [scoped, chosen]);
 
   if (!slug || error)
     return (
@@ -144,7 +149,7 @@ function PublicGuide() {
         {error ?? t.missingSlug}
       </p>
     );
-  if (!guide) return <p className="text-tinta/70">{t.loading}</p>;
+  if (!guide || !scoped) return <p className="text-tinta/70">{t.loading}</p>;
 
   // Only once the stored preferences have been read: showing the welcome to somebody who has
   // already answered it, for the one frame before storage comes back, is worse than a blank.
@@ -162,11 +167,13 @@ function PublicGuide() {
     );
 
   if (view.name === "full")
-    return <FullRoute guide={guide} onBack={() => setView({ name: "landing" })} />;
+    return <FullRoute guide={scoped} onBack={() => setView({ name: "landing" })} />;
 
   return (
     <Landing
-      guide={guide}
+      guide={scoped}
+      routeId={routeId}
+      onRoute={setRouteId}
       reviewed={reviewedOn(guide.reviewed_at)}
       chosen={chosen}
       onToggle={(interest) =>
