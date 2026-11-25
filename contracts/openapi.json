@@ -1118,6 +1118,19 @@
             "type": "string",
             "title": "Processing Status",
             "description": "pending | processing | done | failed: where this recording is."
+          },
+          "ai_usage": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ai Usage",
+            "description": "Tokens Gemini billed for this video: calls, prompt, output, thinking, total and the prompt split by video/image/text. Null when it was not processed with Gemini."
           }
         },
         "type": "object",
@@ -1126,7 +1139,8 @@
           "order",
           "title",
           "video_duration_seconds",
-          "processing_status"
+          "processing_status",
+          "ai_usage"
         ],
         "title": "RouteOut"
       },

@@ -133,6 +133,9 @@ class Route(TimestampMixin, Base):
     processing_status: Mapped[str] = mapped_column(
         String(12), nullable=False, server_default="pending"
     )
+    # Tokens Gemini billed for this video (see ai.gemini.Usage). Null until it has been processed
+    # with Gemini configured.
+    ai_usage: Mapped[dict | None] = mapped_column(JSON().with_variant(JSONB, "postgresql"))
 
     guide: Mapped["Guide"] = relationship(back_populates="routes")
     # No delete-orphan here: a step already belongs to its guide, and two owners that can each

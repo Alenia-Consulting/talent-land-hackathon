@@ -89,6 +89,9 @@ class RouteOut(BaseModel):
     video_duration_seconds: float | None
     processing_status: str = Field(
         description="pending | processing | done | failed: where this recording is.")
+    ai_usage: dict | None = Field(
+        description="Tokens Gemini billed for this video: calls, prompt, output, thinking, total "
+        "and the prompt split by video/image/text. Null when it was not processed with Gemini.")
 
 
 class StepPatch(BaseModel):
