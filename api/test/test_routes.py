@@ -203,6 +203,7 @@ def test_a_route_inserted_before_a_processed_one_does_not_overwrite_its_media(
     guide_id = first["id"]
     sala = first["steps"][0]
     monkeypatch.setattr("routers.guides.UPLOAD_DIR", tmp_path)
+    monkeypatch.setenv("SUPABASE_URL", "https://p.supabase.co")
     monkeypatch.setattr(
         "media.storage.config_from_env",
         lambda: storage.StorageConfig(url="https://p.supabase.co", key="k"),
