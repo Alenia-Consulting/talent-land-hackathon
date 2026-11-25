@@ -129,7 +129,7 @@ export const es = {
     remove: "Quitar",
     add: "Añadir",
     next: "Continuar",
-    needTwo: "Elige al menos dos partes.",
+    needParts: "Elige al menos una parte en «Añadir».",
     needVenue: "Escribe el nombre del centro.",
   },
   marcar: {

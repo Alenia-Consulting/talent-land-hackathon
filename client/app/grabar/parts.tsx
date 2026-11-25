@@ -23,7 +23,7 @@ export const EMPTY_PLAN: Plan = { title: t.guideTitlePlaceholder, venue: "", par
 export function planWarning(plan: Plan): string | null {
   const problem = planProblem(plan.venue, plan.parts.length);
   if (problem === "venue") return t.needVenue;
-  if (problem === "parts") return t.needTwo;
+  if (problem === "parts") return t.needParts;
   return null;
 }
 

@@ -38,13 +38,12 @@ test("marks are rounded to a tenth, so they stay readable", () => {
   assert.equal(markAt(PART, 15_449).marked_at_seconds, 15.4);
 });
 
-test("two marks are enough to send", () => {
-  const marks = [markAt(PART, 0), markAt(PART, 12_000)];
-  assert.equal(whyNotSendable(marks, 60), null);
+test("one mark is enough to send", () => {
+  assert.equal(whyNotSendable([markAt(PART, 0)], 60), null);
 });
 
-test("one mark is not a route", () => {
-  assert.match(whyNotSendable([markAt(PART, 0)], 60) ?? "", /dos/i);
+test("no marks is not a route", () => {
+  assert.match(whyNotSendable([], 60) ?? "", /ninguna/i);
 });
 
 test("marks that do not move forward are refused before reaching the API", () => {
@@ -70,8 +69,7 @@ test("a plan needs a venue before anything else", () => {
   assert.equal(planProblem("   ", 3), "venue");
 });
 
-test("a plan needs at least two parts", () => {
+test("a plan needs at least one part", () => {
   assert.equal(planProblem("Centro de Salud Oeste", 0), "parts");
-  assert.equal(planProblem("Centro de Salud Oeste", 1), "parts");
   assert.equal(planProblem("Centro de Salud Oeste", MIN_MARKS), null);
 });
