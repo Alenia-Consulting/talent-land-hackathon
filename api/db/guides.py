@@ -179,10 +179,35 @@ def latest_route(guide: Guide) -> Route:
 
 def media_paths(guide: Guide) -> list[str]:
     """Every file this guide keeps in storage."""
+    return _step_paths(guide.steps)
+
+
+def route_media_paths(route: Route) -> list[str]:
+    """Every file the steps of this recording keep in storage."""
+    return _step_paths(route.steps)
+
+
+def _step_paths(steps: Iterable[Step]) -> list[str]:
     paths = []
-    for step in guide.steps:
+    for step in steps:
         paths += [path for path in (step.clip_path, step.photo_path, step.sound_path) if path]
     return paths
+
+
+def delete_route(session: Session, guide: Guide, route: Route) -> None:
+    """Remove one recording with its steps, and close the gap it leaves.
+
+    The steps and routes that remain are renumbered from 1 (the numbering is one for the whole
+    guide, so a hole would break "paso 3 de 7") and the guide's duration is the sum of what is
+    left. The caller removes the files from storage first.
+    """
+    for step in list(route.steps):
+        guide.steps.remove(step)
+    guide.routes.remove(route)
+    session.flush()
+    _renumber(guide)
+    guide.video_duration_seconds = sum(one.video_duration_seconds or 0.0 for one in guide.routes)
+    session.flush()
 
 
 def delete(session: Session, guide: Guide) -> None:

@@ -459,6 +459,53 @@
         }
       }
     },
+    "/guides/{guide_id}/routes/{route_id}": {
+      "delete": {
+        "tags": [
+          "guides"
+        ],
+        "summary": "Delete Route",
+        "description": "Remove one recording of a guide with its steps and files, closing the gap in the numbering.\n\nSame order as deleting a guide: the files first, so a storage failure leaves the route in\nplace to try again. The last recording of a published guide stays: deleting it would leave a\npublic link, maybe already printed as a QR, pointing at nothing.",
+        "operationId": "delete_route_guides__guide_id__routes__route_id__delete",
+        "parameters": [
+          {
+            "name": "guide_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Guide Id"
+            }
+          },
+          {
+            "name": "route_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Route Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/guides/{guide_id}/video": {
       "post": {
         "tags": [

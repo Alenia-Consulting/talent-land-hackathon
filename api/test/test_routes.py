@@ -237,3 +237,118 @@ def test_a_route_inserted_before_a_processed_one_does_not_overwrite_its_media(
     by_title = {s["title"]: s for s in body["steps"]}
     assert by_title["Recepción"]["order"] < by_title[sala["title"]]["order"]
     assert by_title["Recepción"]["clip_url"] != by_title[sala["title"]]["clip_url"]
+
+
+def _guide_with_three_routes(client):
+    guide = create_guide(client).json()
+    for title in ("Rayos X", "Salida"):
+        guide = add_route(client, guide["id"], title=title).json()
+    return guide
+
+
+def _no_storage(monkeypatch, removed=None):
+    monkeypatch.setattr(
+        "media.storage.config_from_env",
+        lambda: storage.StorageConfig(url="https://p.supabase.co", key="k"),
+    )
+    monkeypatch.setattr(
+        "media.storage.remove", lambda config, paths: removed is None or removed.extend(paths)
+    )
+
+
+def test_deleting_a_route_takes_its_steps_and_renumbers_what_is_left(client, monkeypatch):
+    """Without holes: the numbering is one for the whole guide."""
+    _no_storage(monkeypatch)
+    guide = _guide_with_three_routes(client)
+    first = guide["routes"][0]
+
+    assert client.delete(f"/guides/{guide['id']}/routes/{first['id']}").status_code == 204
+
+    after = client.get(f"/guides/{guide['id']}").json()
+    assert [route["order"] for route in after["routes"]] == [1, 2]
+    assert [route["title"] for route in after["routes"]] == ["Rayos X", "Salida"]
+    assert [step["order"] for step in after["steps"]] == [1, 2, 3, 4]
+    assert after["video_duration_seconds"] == pytest.approx(
+        sum(route["video_duration_seconds"] for route in after["routes"])
+    )
+
+
+def test_deleting_a_route_removes_only_its_files(client, db_session, monkeypatch):
+    from db import guides
+
+    removed = []
+    _no_storage(monkeypatch, removed)
+    guide = _guide_with_three_routes(client)
+    stored = guides.get(db_session, uuid.UUID(guide["id"]))
+    for number, step in enumerate(stored.steps):
+        step.clip_path = f"{guide['id']}/{number}.mp4"
+    db_session.commit()
+    first = guide["routes"][0]
+
+    client.delete(f"/guides/{guide['id']}/routes/{first['id']}")
+
+    first_steps = [s for s in guide["steps"] if s["route_id"] == first["id"]]
+    assert len(removed) == len(first_steps) > 0
+
+
+def test_a_storage_failure_keeps_the_route(client, db_session, monkeypatch):
+    from db import guides
+
+    guide = _guide_with_three_routes(client)
+    stored = guides.get(db_session, uuid.UUID(guide["id"]))
+    stored.steps[0].clip_path = f"{guide['id']}/a.mp4"
+    db_session.commit()
+    monkeypatch.setattr(
+        "media.storage.config_from_env",
+        lambda: storage.StorageConfig(url="https://p.supabase.co", key="k"),
+    )
+
+    def refuse(config, paths):
+        raise storage.StorageError("storage refused the deletion: HTTP 500")
+
+    monkeypatch.setattr("media.storage.remove", refuse)
+
+    response = client.delete(f"/guides/{guide['id']}/routes/{guide['routes'][0]['id']}")
+
+    assert response.status_code == 502
+    assert len(client.get(f"/guides/{guide['id']}").json()["routes"]) == 3
+
+
+def test_the_last_route_of_a_published_guide_cannot_be_deleted(client, monkeypatch):
+    """It would leave a public link, maybe already in a QR, pointing at nothing."""
+    from test_guides_api import complete_every_step
+
+    _no_storage(monkeypatch)
+    guide = create_guide(client).json()
+    complete_every_step(client, guide)
+    client.post(f"/guides/{guide['id']}/publish")
+
+    response = client.delete(f"/guides/{guide['id']}/routes/{guide['routes'][0]['id']}")
+
+    assert response.status_code == 409
+    assert "publicada" in response.json()["detail"]
+
+
+def test_one_of_several_routes_can_be_deleted_from_a_published_guide(client, monkeypatch):
+    """Whoever deletes is the venue itself: that is the human review."""
+    from test_guides_api import complete_every_step
+
+    _no_storage(monkeypatch)
+    guide = add_route(client, create_guide(client).json()["id"]).json()
+    complete_every_step(client, guide)
+    published = client.post(f"/guides/{guide['id']}/publish").json()
+
+    response = client.delete(f"/guides/{guide['id']}/routes/{guide['routes'][1]['id']}")
+
+    assert response.status_code == 204
+    assert client.get(f"/public/{published['public_slug']}").status_code == 200
+
+
+def test_a_route_of_another_guide_is_not_found(client, monkeypatch):
+    _no_storage(monkeypatch)
+    one = create_guide(client).json()
+    other = create_guide(client).json()
+
+    response = client.delete(f"/guides/{other['id']}/routes/{one['routes'][0]['id']}")
+
+    assert response.status_code == 404

@@ -167,6 +167,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/guides/{guide_id}/routes/{route_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete Route
+         * @description Remove one recording of a guide with its steps and files, closing the gap in the numbering.
+         *
+         *     Same order as deleting a guide: the files first, so a storage failure leaves the route in
+         *     place to try again. The last recording of a published guide stays: deleting it would leave a
+         *     public link, maybe already printed as a QR, pointing at nothing.
+         */
+        delete: operations["delete_route_guides__guide_id__routes__route_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/guides/{guide_id}/video": {
         parameters: {
             query?: never;
@@ -1020,6 +1044,36 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["GuideOut"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_route_guides__guide_id__routes__route_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                guide_id: string;
+                route_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

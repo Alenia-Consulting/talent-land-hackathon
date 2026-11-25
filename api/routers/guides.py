@@ -266,6 +266,35 @@ def delete_guide(guide_id: uuid.UUID, session: Session = Depends(get_session)) -
     session.commit()
 
 
+@router.delete("/guides/{guide_id}/routes/{route_id}", status_code=204)
+def delete_route(
+    guide_id: uuid.UUID, route_id: uuid.UUID, session: Session = Depends(get_session)
+) -> None:
+    """Remove one recording of a guide with its steps and files, closing the gap in the numbering.
+
+    Same order as deleting a guide: the files first, so a storage failure leaves the route in
+    place to try again. The last recording of a published guide stays: deleting it would leave a
+    public link, maybe already printed as a QR, pointing at nothing.
+    """
+    guide = _load(session, guide_id)
+    route = guides.route_of(guide, route_id)
+    if route is None:
+        raise HTTPException(status_code=404, detail="route not found")
+    if guide.status == "published" and len(guide.routes) == 1:
+        raise HTTPException(
+            status_code=409,
+            detail="No se puede borrar el único recorrido de una guía publicada.",
+        )
+    paths = guides.route_media_paths(route)
+    if paths:
+        try:
+            storage.remove(storage.config_from_env(), paths)
+        except storage.StorageError as error:
+            raise HTTPException(status_code=502, detail=str(error)) from error
+    guides.delete_route(session, guide, route)
+    session.commit()
+
+
 @router.post("/guides/{guide_id}/video", response_model=GuideOut)
 def upload_video(
     guide_id: uuid.UUID,
