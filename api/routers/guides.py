@@ -14,11 +14,11 @@ from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from sqlalchemy.orm import Session
 
 from db import guides
-from db.models import Guide
+from db.models import Guide, Route
 from db.session import get_session
 from ai import gemini
 from media import pipeline, storage
-from schemas import GuideCreate, GuideOut, GuideSummary, Pending, StepPatch
+from schemas import GuideCreate, GuideOut, GuideSummary, Pending, RouteCreate, StepPatch
 
 router = APIRouter(tags=["guides"])
 
@@ -93,9 +93,14 @@ def _write_texts(by_position: dict, processed: list[pipeline.ProcessedStep]) -> 
         }
 
 
-def _set_processing_status(session: Session, guide: Guide, status: str) -> None:
-    """Save where the recording is, dropping whatever half-done work is still pending."""
+def _set_processing_status(session: Session, guide: Guide, route: Route, status: str) -> None:
+    """Save where the recording is, dropping whatever half-done work is still pending.
+
+    The guide shows the state of the recording it last received, so the panel's one badge keeps
+    meaning "is the video I just sent ready".
+    """
     session.rollback()
+    route.processing_status = status
     guide.processing_status = status
     session.commit()
 
@@ -182,31 +187,96 @@ def read_public_guide(slug: str, session: Session = Depends(get_session)) -> Gui
     return GuideOut.model_validate(guide)
 
 
+@router.post("/guides/{guide_id}/routes", status_code=201, response_model=GuideOut)
+def add_route(
+    guide_id: uuid.UUID, payload: RouteCreate, session: Session = Depends(get_session)
+) -> GuideOut:
+    """Add another recording to a guide that already exists.
+
+    Same shape as creating a guide, minus the place: the marks become steps that continue the
+    guide's numbering, and the video is sent afterwards to `/guides/{id}/routes/{route}/video`.
+    Nothing already in the guide is touched.
+    """
+    guide = _load(session, guide_id)
+    try:
+        guides.add_route(
+            session,
+            guide,
+            title=payload.title,
+            marks=[mark.model_dump() for mark in payload.marks],
+            video_duration_seconds=payload.video_duration_seconds,
+        )
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+    session.commit()
+    return _with_pending(guide)
+
+
+@router.delete("/guides/{guide_id}", status_code=204)
+def delete_guide(guide_id: uuid.UUID, session: Session = Depends(get_session)) -> None:
+    """Remove a guide, published or not, with its steps and every file it keeps in storage.
+
+    The files go first: if storage refuses, the guide stays and can be deleted again, instead of
+    leaving clips and photos of people nobody can reach any more. It cannot be undone.
+    """
+    guide = _load(session, guide_id)
+    paths = guides.media_paths(guide)
+    if paths:
+        try:
+            storage.remove(storage.config_from_env(), paths)
+        except storage.StorageError as error:
+            raise HTTPException(status_code=502, detail=str(error)) from error
+    guides.delete(session, guide)
+    session.commit()
+
+
 @router.post("/guides/{guide_id}/video", response_model=GuideOut)
 def upload_video(
     guide_id: uuid.UUID,
     video: UploadFile = File(description="The recording, as taken by the phone."),
     session: Session = Depends(get_session),
 ) -> GuideOut:
-    """Receive the recording, blur the faces and store only the processed media.
+    """Send the video of the guide's latest route (the only one, for a guide with one).
+
+    Kept for the recorder, which sends one video per guide. See the route version below.
+    """
+    guide = _load(session, guide_id)
+    return _ingest(session, guide, guides.latest_route(guide), video)
+
+
+@router.post("/guides/{guide_id}/routes/{route_id}/video", response_model=GuideOut)
+def upload_route_video(
+    guide_id: uuid.UUID,
+    route_id: uuid.UUID,
+    video: UploadFile = File(description="The recording, as taken by the phone."),
+    session: Session = Depends(get_session),
+) -> GuideOut:
+    """Receive the recording of one route, blur the faces and store only the processed media.
 
     The original never reaches storage and is deleted from this server either way: it shows the
     faces of patients and staff who did not agree to be filmed. Answers 503 while the blurring is
     not implemented, rather than storing a recording nobody has cleaned.
     """
     guide = _load(session, guide_id)
+    route = guides.route_of(guide, route_id)
+    if route is None:
+        raise HTTPException(status_code=404, detail="route not found")
+    return _ingest(session, guide, route, video)
 
+
+def _ingest(session: Session, guide: Guide, route: Route, video: UploadFile) -> GuideOut:
     if not (video.content_type or "").startswith("video/"):
         raise HTTPException(status_code=415, detail="el fichero debe ser un vídeo")
-    if guide.processing_status == "processing":
+    if route.processing_status == "processing":
         raise HTTPException(status_code=409, detail="este vídeo ya se está procesando")
 
     UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
-    target = UPLOAD_DIR / f"{guide_id}-{uuid.uuid4().hex}"
+    target = UPLOAD_DIR / f"{guide.id}-{uuid.uuid4().hex}"
     try:
         _save_upload(video, target)
-        _set_processing_status(session, guide, "processing")
+        _set_processing_status(session, guide, route, "processing")
 
+        steps = route.steps
         timings = [
             pipeline.StepTiming(
                 position=step.position,
@@ -214,17 +284,18 @@ def upload_video(
                 end_seconds=step.end_seconds,
                 photo_second=step.photo_second,
             )
-            for step in guide.steps
+            for step in steps
         ]
         processed = pipeline.process(target, timings)
 
         config = storage.config_from_env()
-        by_position = {step.position: step for step in guide.steps}
+        by_position = {step.position: step for step in steps}
         for item in processed:
             step = by_position.get(item.position)
             if step is None:
                 continue
             # Always the id: the slug only exists once published, and the path must not move then.
+            # Positions are unique across the guide's routes, so two routes never share a path.
             base = f"{guide.id}/paso-{item.position}"
             step.clip_path = storage.upload(config, f"{base}.mp4", item.clip, "video/mp4")
             step.photo_path = storage.upload(config, f"{base}.jpg", item.photo, "image/jpeg")
@@ -235,17 +306,18 @@ def upload_video(
                 step.noise_level = item.noise_level
                 step.noise_level_source = "measured"
         _write_texts(by_position, processed)
+        route.processing_status = "done"
         guide.processing_status = "done"
         session.commit()
     except pipeline.ProcessingUnavailable as error:
-        # Nothing was tried, so the guide goes back to waiting for a recording.
-        _set_processing_status(session, guide, "pending")
+        # Nothing was tried, so the route goes back to waiting for a recording.
+        _set_processing_status(session, guide, route, "pending")
         raise HTTPException(status_code=503, detail=str(error)) from error
     except pipeline.ProcessingFailed as error:
-        _set_processing_status(session, guide, "failed")
+        _set_processing_status(session, guide, route, "failed")
         raise HTTPException(status_code=422, detail=str(error)) from error
     except storage.StorageError as error:
-        _set_processing_status(session, guide, "failed")
+        _set_processing_status(session, guide, route, "failed")
         raise HTTPException(status_code=502, detail=str(error)) from error
     finally:
         # The recording never stays on the server, whatever happened above.

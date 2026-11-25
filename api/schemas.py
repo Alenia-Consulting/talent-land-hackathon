@@ -68,6 +68,29 @@ class GuideCreate(BaseModel):
     language: str = Field(default="es", max_length=10)
 
 
+class RouteCreate(BaseModel):
+    """Another recording of a guide that already exists."""
+
+    title: str = Field(min_length=1, max_length=120,
+                       description="Name of this recording: 'Entrada principal', 'Sala de rayos X'.")
+    video_duration_seconds: float = Field(gt=0)
+    marks: list[MarkIn] = Field(
+        min_length=2, max_length=12,
+        description="Same rules as when creating a guide. The steps continue the guide's numbering.",
+    )
+
+
+class RouteOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    order: int = Field(validation_alias="position", description="1-based position among the guide's routes.")
+    title: str
+    video_duration_seconds: float | None
+    processing_status: str = Field(
+        description="pending | processing | done | failed: where this recording is.")
+
+
 class StepPatch(BaseModel):
     """The review panel's edits. Only the fields sent are changed."""
 
@@ -94,6 +117,8 @@ class StepOut(BaseModel):
     id: uuid.UUID
     order: int = Field(validation_alias="position",
                        description="1-based position. Stored as `position`: ORDER is reserved in SQL.")
+    route_id: uuid.UUID | None = Field(
+        description="The recording this step was cut from. Null only on steps older than routes.")
     title: str
     start_seconds: float = Field(description="The mark. Adjustable from the review panel.")
     end_seconds: float = Field(description="The next mark, or the end of the video.")
@@ -181,6 +206,7 @@ class GuideSummary(BaseModel):
 
 
 class GuideOut(GuideSummary):
+    routes: list[RouteOut] = Field(description="The guide's recordings, in order.")
     steps: list[StepOut]
     pending: Pending | None = Field(
         default=None,

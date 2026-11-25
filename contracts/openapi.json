@@ -156,6 +156,41 @@
             }
           }
         }
+      },
+      "delete": {
+        "tags": [
+          "guides"
+        ],
+        "summary": "Delete Guide",
+        "description": "Remove a guide, published or not, with its steps and every file it keeps in storage.\n\nThe files go first: if storage refuses, the guide stays and can be deleted again, instead of\nleaving clips and photos of people nobody can reach any more. It cannot be undone.",
+        "operationId": "delete_guide_guides__guide_id__delete",
+        "parameters": [
+          {
+            "name": "guide_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Guide Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/guides/{guide_id}/steps/{step_id}": {
@@ -309,13 +344,67 @@
         }
       }
     },
+    "/guides/{guide_id}/routes": {
+      "post": {
+        "tags": [
+          "guides"
+        ],
+        "summary": "Add Route",
+        "description": "Add another recording to a guide that already exists.\n\nSame shape as creating a guide, minus the place: the marks become steps that continue the\nguide's numbering, and the video is sent afterwards to `/guides/{id}/routes/{route}/video`.\nNothing already in the guide is touched.",
+        "operationId": "add_route_guides__guide_id__routes_post",
+        "parameters": [
+          {
+            "name": "guide_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Guide Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RouteCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GuideOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/guides/{guide_id}/video": {
       "post": {
         "tags": [
           "guides"
         ],
         "summary": "Upload Video",
-        "description": "Receive the recording, blur the faces and store only the processed media.\n\nThe original never reaches storage and is deleted from this server either way: it shows the\nfaces of patients and staff who did not agree to be filmed. Answers 503 while the blurring is\nnot implemented, rather than storing a recording nobody has cleaned.",
+        "description": "Send the video of the guide's latest route (the only one, for a guide with one).\n\nKept for the recorder, which sends one video per guide. See the route version below.",
         "operationId": "upload_video_guides__guide_id__video_post",
         "parameters": [
           {
@@ -335,6 +424,70 @@
             "multipart/form-data": {
               "schema": {
                 "$ref": "#/components/schemas/Body_upload_video_guides__guide_id__video_post"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GuideOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/guides/{guide_id}/routes/{route_id}/video": {
+      "post": {
+        "tags": [
+          "guides"
+        ],
+        "summary": "Upload Route Video",
+        "description": "Receive the recording of one route, blur the faces and store only the processed media.\n\nThe original never reaches storage and is deleted from this server either way: it shows the\nfaces of patients and staff who did not agree to be filmed. Answers 503 while the blurring is\nnot implemented, rather than storing a recording nobody has cleaned.",
+        "operationId": "upload_route_video_guides__guide_id__routes__route_id__video_post",
+        "parameters": [
+          {
+            "name": "guide_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Guide Id"
+            }
+          },
+          {
+            "name": "route_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Route Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_upload_route_video_guides__guide_id__routes__route_id__video_post"
               }
             }
           }
@@ -406,6 +559,21 @@
   },
   "components": {
     "schemas": {
+      "Body_upload_route_video_guides__guide_id__routes__route_id__video_post": {
+        "properties": {
+          "video": {
+            "type": "string",
+            "format": "binary",
+            "title": "Video",
+            "description": "The recording, as taken by the phone."
+          }
+        },
+        "type": "object",
+        "required": [
+          "video"
+        ],
+        "title": "Body_upload_route_video_guides__guide_id__routes__route_id__video_post"
+      },
       "Body_upload_video_guides__guide_id__video_post": {
         "properties": {
           "video": {
@@ -577,6 +745,14 @@
             "format": "date-time",
             "title": "Updated At"
           },
+          "routes": {
+            "items": {
+              "$ref": "#/components/schemas/RouteOut"
+            },
+            "type": "array",
+            "title": "Routes",
+            "description": "The guide's recordings, in order."
+          },
           "steps": {
             "items": {
               "$ref": "#/components/schemas/StepOut"
@@ -612,6 +788,7 @@
           "cover_photo_url",
           "created_at",
           "updated_at",
+          "routes",
           "steps"
         ],
         "title": "GuideOut"
@@ -876,6 +1053,83 @@
         "title": "PointOfInterest",
         "description": "Something on the step's photo worth pointing at, to help a visitor find their way."
       },
+      "RouteCreate": {
+        "properties": {
+          "title": {
+            "type": "string",
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Title",
+            "description": "Name of this recording: 'Entrada principal', 'Sala de rayos X'."
+          },
+          "video_duration_seconds": {
+            "type": "number",
+            "exclusiveMinimum": 0.0,
+            "title": "Video Duration Seconds"
+          },
+          "marks": {
+            "items": {
+              "$ref": "#/components/schemas/MarkIn"
+            },
+            "type": "array",
+            "maxItems": 12,
+            "minItems": 2,
+            "title": "Marks",
+            "description": "Same rules as when creating a guide. The steps continue the guide's numbering."
+          }
+        },
+        "type": "object",
+        "required": [
+          "title",
+          "video_duration_seconds",
+          "marks"
+        ],
+        "title": "RouteCreate",
+        "description": "Another recording of a guide that already exists."
+      },
+      "RouteOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "order": {
+            "type": "integer",
+            "title": "Order",
+            "description": "1-based position among the guide's routes."
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "video_duration_seconds": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Video Duration Seconds"
+          },
+          "processing_status": {
+            "type": "string",
+            "title": "Processing Status",
+            "description": "pending | processing | done | failed: where this recording is."
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "order",
+          "title",
+          "video_duration_seconds",
+          "processing_status"
+        ],
+        "title": "RouteOut"
+      },
       "StepOut": {
         "properties": {
           "id": {
@@ -887,6 +1141,19 @@
             "type": "integer",
             "title": "Order",
             "description": "1-based position. Stored as `position`: ORDER is reserved in SQL."
+          },
+          "route_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Route Id",
+            "description": "The recording this step was cut from. Null only on steps older than routes."
           },
           "title": {
             "type": "string",
@@ -1066,6 +1333,7 @@
         "required": [
           "id",
           "order",
+          "route_id",
           "title",
           "start_seconds",
           "end_seconds",
