@@ -65,6 +65,10 @@ class GuideCreate(BaseModel):
         description="One per part reached, in order. Must move forward in time and all fall "
                     "before video_duration_seconds. Each mark becomes a step running to the next.",
     )
+    route_title: str | None = Field(
+        default=None, min_length=1, max_length=120,
+        description="Name of the first recording, the part it covers: 'Entrada'. Defaults to title.",
+    )
     language: str = Field(default="es", max_length=10)
 
 
@@ -74,6 +78,11 @@ class RouteCreate(BaseModel):
     title: str = Field(min_length=1, max_length=120,
                        description="Name of this recording: 'Entrada principal', 'Sala de rayos X'.")
     video_duration_seconds: float = Field(gt=0)
+    position: int | None = Field(
+        default=None, ge=1,
+        description="Place among the guide's routes, 1-based. Omitted: it goes last. The routes "
+                    "from there on move down and the steps are renumbered.",
+    )
     marks: list[MarkIn] = Field(
         min_length=1, max_length=12,
         description="Same rules as when creating a guide. The steps continue the guide's numbering.",

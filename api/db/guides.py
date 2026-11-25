@@ -16,7 +16,7 @@ from collections.abc import Iterable
 from datetime import UTC, datetime
 
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, object_session
 
 from db.models import Guide, Route, Step
 
@@ -38,11 +38,13 @@ def create(
     marks: Iterable[dict],
     video_duration_seconds: float,
     language: str = "es",
+    route_title: str | None = None,
 ) -> Guide:
     """Store a new guide as a draft, with one step per mark.
 
     The steps have no text yet: Gemini writes it afterwards and a person reviews it. Only a human
-    publishes the result.
+    publishes the result. The first route is named after its part when `route_title` comes, and
+    after the guide otherwise.
     """
     steps = _steps_from_marks(marks, video_duration_seconds)
     guide = Guide(
@@ -52,7 +54,8 @@ def create(
         status="draft",
         video_duration_seconds=video_duration_seconds,
     )
-    route = Route(position=1, title=title, video_duration_seconds=video_duration_seconds)
+    route = Route(position=1, title=route_title or title,
+                  video_duration_seconds=video_duration_seconds)
     route.steps = [Step(**step) for step in steps]
     guide.routes = [route]
     guide.steps = list(route.steps)
@@ -68,31 +71,61 @@ def add_route(
     title: str,
     marks: Iterable[dict],
     video_duration_seconds: float,
+    position: int | None = None,
 ) -> Route:
     """Add another recording to a guide, with one step per mark.
 
-    The steps continue the guide's numbering, so "paso 3 de 7" keeps meaning something across
-    routes. The guide goes back to waiting for a video: the new route has none yet.
+    Without a position it goes last. With one it enters there and the routes after it move down;
+    either way the steps of the whole guide are renumbered, so "paso 3 de 7" keeps meaning
+    something. The guide goes back to waiting for a video: the new route has none yet.
     """
     if not guide.routes:
         latest_route(guide)  # a guide older than routes keeps its steps in route 1
-    first = max((step.position for step in guide.steps), default=0) + 1
-    steps = _steps_from_marks(marks, video_duration_seconds, first_position=first)
-    route = Route(
-        guide_id=guide.id,
-        position=max((one.position for one in guide.routes), default=0) + 1,
-        title=title,
-        video_duration_seconds=video_duration_seconds,
-    )
-    route.steps = [Step(**step) for step in steps]
-    guide.routes.append(route)
-    guide.steps.extend(route.steps)
+    steps = _steps_from_marks(marks, video_duration_seconds)
+    # Positions are unique per guide and the new rows start at 1: nothing may be flushed until
+    # _renumber has moved every row out of the way.
+    with session.no_autoflush:
+        last = max((one.position for one in guide.routes), default=0) + 1
+        place = last if position is None else min(position, last)
+        for one in guide.routes:
+            if one.position >= place:
+                one.position += 1
+        route = Route(
+            guide_id=guide.id,
+            position=place,
+            title=title,
+            video_duration_seconds=video_duration_seconds,
+        )
+        route.steps = [Step(**step) for step in steps]
+        guide.routes.append(route)
+        guide.steps.extend(route.steps)
+    _renumber(guide)
     guide.processing_status = "pending"
     guide.video_duration_seconds = sum(
         one.video_duration_seconds or 0.0 for one in guide.routes
     )
     session.flush()
     return route
+
+
+def _renumber(guide: Guide) -> None:
+    """Number the routes 1..n and, following that order, the steps of the guide 1..m.
+
+    Only numbers: durations and everything else stay where they are. The positions are unique per
+    guide, so they first move out of the way (to negatives) and are flushed; otherwise two rows
+    would briefly share a number and the database would refuse.
+    """
+    session = object_session(guide)  # a guide being renumbered always lives in one
+    with session.no_autoflush:
+        routes = sorted(guide.routes, key=lambda one: one.position)
+        steps = [step for one in routes for step in sorted(one.steps, key=lambda s: s.position)]
+    for index, row in enumerate([*routes, *steps], start=1):
+        row.position = -index
+    session.flush()
+    for number, one in enumerate(routes, start=1):
+        one.position = number
+    for number, step in enumerate(steps, start=1):
+        step.position = number
 
 
 def retime_route(route: Route, measured_seconds: float) -> None:

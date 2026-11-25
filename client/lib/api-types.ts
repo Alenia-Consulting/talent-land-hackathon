@@ -292,6 +292,11 @@ export interface components {
              */
             marks: components["schemas"]["MarkIn"][];
             /**
+             * Route Title
+             * @description Name of the first recording, the part it covers: 'Entrada'. Defaults to title.
+             */
+            route_title?: string | null;
+            /**
              * Language
              * @default es
              */
@@ -535,6 +540,11 @@ export interface components {
             title: string;
             /** Video Duration Seconds */
             video_duration_seconds: number;
+            /**
+             * Position
+             * @description Place among the guide's routes, 1-based. Omitted: it goes last. The routes from there on move down and the steps are renumbered.
+             */
+            position?: number | null;
             /**
              * Marks
              * @description Same rules as when creating a guide. The steps continue the guide's numbering.

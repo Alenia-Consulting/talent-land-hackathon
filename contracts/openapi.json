@@ -680,6 +680,20 @@
             "title": "Marks",
             "description": "One per part reached, in order. Must move forward in time and all fall before video_duration_seconds. Each mark becomes a step running to the next."
           },
+          "route_title": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 120,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Route Title",
+            "description": "Name of the first recording, the part it covers: 'Entrada'. Defaults to title."
+          },
           "language": {
             "type": "string",
             "maxLength": 10,
@@ -1196,6 +1210,19 @@
             "type": "number",
             "exclusiveMinimum": 0.0,
             "title": "Video Duration Seconds"
+          },
+          "position": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Position",
+            "description": "Place among the guide's routes, 1-based. Omitted: it goes last. The routes from there on move down and the steps are renumbered."
           },
           "marks": {
             "items": {

@@ -145,6 +145,7 @@ def create_guide(payload: GuideCreate, session: Session = Depends(get_session)) 
             marks=[mark.model_dump() for mark in payload.marks],
             video_duration_seconds=payload.video_duration_seconds,
             language=payload.language,
+            route_title=payload.route_title,
         )
     except ValueError as error:
         raise HTTPException(status_code=422, detail=str(error)) from error
@@ -239,6 +240,7 @@ def add_route(
             title=payload.title,
             marks=[mark.model_dump() for mark in payload.marks],
             video_duration_seconds=payload.video_duration_seconds,
+            position=payload.position,
         )
     except ValueError as error:
         raise HTTPException(status_code=422, detail=str(error)) from error
