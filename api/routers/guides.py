@@ -352,6 +352,8 @@ def _ingest(session: Session, guide: Guide, route: Route, video: UploadFile) -> 
         _set_processing_status(session, guide, route, "pending")
         raise HTTPException(status_code=503, detail=str(error)) from error
     except pipeline.ProcessingFailed as error:
+        # The client only gets the message; the cause (what ffmpeg or imageio said) stays here.
+        logger.warning("processing failed route=%s: %s", route.id, error, exc_info=error)
         _set_processing_status(session, guide, route, "failed")
         raise HTTPException(status_code=422, detail=str(error)) from error
     except storage.StorageError as error:

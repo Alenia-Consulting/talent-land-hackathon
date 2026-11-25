@@ -279,3 +279,14 @@ def test_a_recording_already_being_processed_is_refused(client, db_session, make
     response = upload(client, guide.id)
 
     assert response.status_code == 409
+
+
+def test_why_a_recording_failed_is_logged(client, db_session, make_guide, caplog):
+    guide = make_guide()
+    db_session.add(guide)
+    db_session.commit()
+
+    with caplog.at_level("WARNING", logger="uvicorn.error"):
+        upload(client, guide.id, content=b"not really a video" * 50)
+
+    assert "processing failed" in caplog.text
