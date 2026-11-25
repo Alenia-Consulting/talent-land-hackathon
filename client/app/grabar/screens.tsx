@@ -1,7 +1,6 @@
 import type { ReactNode } from "react";
 
 import { es } from "../../lib/i18n/es.ts";
-import { countByType, type RecordingAlert } from "../../lib/pure/alerts.ts";
 import { ProgressSegments } from "../controls.tsx";
 import { DocumentIcon, PeopleIcon, SunIcon, WalkIcon } from "../icons.tsx";
 import { Card } from "../ui.tsx";
@@ -124,110 +123,6 @@ export function PermissionScreen({ starting, resumed }: { starting: boolean; res
       {resumed && (
         <p className="rounded-2xl bg-ambar/35 px-4 py-3 text-sobre-ambar">{es.permisos.resumed}</p>
       )}
-    </Message>
-  );
-}
-
-export function alertSummary(alerts: RecordingAlert[]): string {
-  const counts = countByType(alerts);
-  const parts = [
-    counts.luz > 0 ? es.revision.darkSegments(counts.luz) : null,
-    counts.movimiento > 0 ? es.revision.fastSegments(counts.movimiento) : null,
-  ].filter((part) => part !== null);
-  return parts.length > 0 ? parts.join(", ") : es.revision.noAlerts;
-}
-
-export function ReviewScreen({
-  url,
-  alerts,
-  notice,
-  problem,
-}: {
-  url: string;
-  alerts: RecordingAlert[];
-  notice: string | null;
-  /** Why this recording cannot be sent, shown here instead of on an error screen. */
-  problem: string | null;
-}) {
-  return (
-    <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-4">
-      <h1 className="text-3xl font-extrabold">{es.revision.title}</h1>
-      <video
-        src={url}
-        className="max-h-[50vh] w-full rounded-2xl bg-tinta object-contain"
-        controls
-        playsInline
-      />
-      {problem && (
-        <div className="rounded-2xl bg-ambar/35 px-4 py-3" role="alert">
-          <p className="text-lg font-bold text-sobre-ambar">{es.revision.cannotSend}</p>
-          <p className="mt-1 text-tinta">{problem}</p>
-        </div>
-      )}
-      {notice && (
-        <p className="rounded-2xl bg-ambar/25 px-4 py-3 text-sobre-ambar">{notice}</p>
-      )}
-      <p className="text-tinta/70">
-        <span className="font-bold">{es.revision.alertsTitle}: </span>
-        {alertSummary(alerts)}
-      </p>
-    </div>
-  );
-}
-
-/**
- * While the recording travels and the guide is assembled.
- *
- * The stages are named rather than hidden behind a spinner: "Difuminando las caras" is the
- * promise this product makes, and seeing it happen is part of trusting it.
- */
-export function SendingScreen({ progress }: { progress: number }) {
-  const percent = Math.round(progress * 100);
-  // Rounded down, so the last stage is ticked only at 100 %, when the server has answered.
-  const reached = Math.floor((percent / 100) * es.proceso.stages.length);
-
-  return (
-    <Message title={es.proceso.title} step={{ label: es.proceso.step, current: 3 }}>
-      <p className="text-5xl font-extrabold text-pino tabular-nums">{percent}%</p>
-      <div
-        className="h-3 w-full overflow-hidden rounded-full bg-salvia"
-        role="progressbar"
-        aria-valuemin={0}
-        aria-valuemax={100}
-        aria-valuenow={percent}
-      >
-        <div className="h-full bg-pino" style={{ width: `${percent}%` }} />
-      </div>
-      <p className="text-tinta/70">{es.proceso.lead}</p>
-
-      <Card>
-        <ul className="grid gap-3">
-          {es.proceso.stages.map((stage, index) => {
-            const done = index < reached;
-            return (
-              <li key={stage} className="flex items-center gap-3">
-                <span
-                  aria-hidden="true"
-                  className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full border-2 text-sm font-bold ${
-                    done ? "border-pino bg-pino text-sobre-pino" : "border-tinta/25 text-tinta/40"
-                  }`}
-                >
-                  {done ? "✓" : ""}
-                </span>
-                <span className={done ? "font-bold" : "text-tinta/60"}>{stage}</span>
-              </li>
-            );
-          })}
-        </ul>
-      </Card>
-    </Message>
-  );
-}
-
-export function DoneScreen({ videoSent }: { videoSent: boolean }) {
-  return (
-    <Message title={es.hecho.title}>
-      <p className="text-xl text-tinta/70">{videoSent ? es.hecho.leadSent : es.hecho.lead}</p>
     </Message>
   );
 }

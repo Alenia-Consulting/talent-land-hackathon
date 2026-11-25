@@ -32,7 +32,7 @@ export const es = {
   intro: {
     step: "Paso 1 de 3",
     title: "Antes de grabar",
-    lead: "Grabarás el camino de alguien que viene por primera vez. Mientras grabas, te iremos guiando.",
+    lead: "Grabarás el camino de alguien que viene por primera vez, una parte cada vez.",
     tips: [
       {
         icon: "luz",
@@ -47,7 +47,7 @@ export const es = {
       {
         icon: "andar",
         title: "Camina despacio",
-        body: "Para 3 segundos en cada zona. Ahí sale la foto y se mide el sonido.",
+        body: "Graba cada parte andando despacio. Dura 45 segundos como mucho.",
       },
       {
         icon: "cartel",
@@ -65,58 +65,49 @@ export const es = {
     resumed: "La cámara se cerró al salir de la app. Actívala de nuevo para continuar.",
   },
   listo: {
-    hint: "Colócate en la puerta de entrada y pulsa «Empezar».",
+    hint: (parte: string) => `Colócate en ${parte} y pulsa «Empezar».`,
     start: "Empezar",
   },
   grabando: {
     stop: "Parar",
     remaining: "Tiempo restante",
-    max: "máx. 2:00",
-    nextPart: (parte: string) => `Siguiente parte: ${parte}`,
-    nextHint:
-      "Cuando llegues, pulsa «Llegué» y quédate quieto 3 segundos. Así sale una foto clara y se mide el sonido.",
-    allDone: "Ya marcaste todas las partes. Para cuando quieras.",
+    max: "máx. 0:45",
+    part: (parte: string) => `Grabando: ${parte}`,
+    hint: "Enseña el sitio andando despacio. Para cuando hayas terminado esta parte.",
   },
-  // While the guide is being put together. Each line is a real stage of the pipeline, so a
-  // person waiting knows what is happening to their recording and why it takes a minute.
-  proceso: {
-    step: "Paso 3 de 3",
-    title: "Estamos montando tu guía",
-    lead: "No cierres esta pantalla todavía.",
-    stages: [
-      "Las partes con tus nombres",
-      "Clips cortados y estabilizados",
-      "Difuminando las caras",
-      "Filtrando las voces",
-      "Midiendo el ruido de cada zona",
-    ],
+  // La lista de tomas: una grabación por parte, cuando la persona está lista.
+  takes: {
+    title: "Graba cada parte",
+    lead: "Graba una parte cada vez, cuando estés listo. Antes de pasar a la siguiente puedes repetir la última.",
+    finishedTitle: "Tu guía se está montando",
+    finishedLead: "Ya puedes revisarla. Las partes que siguen subiendo aparecerán cuando terminen.",
+    count: (hechas: number, total: number) => `${hechas} de ${total} grabadas`,
+    record: "Grabar",
+    recordNext: (parte: string) => `Grabar: ${parte}`,
+    repeat: "Repetir",
+    finish: "Terminar",
+    retry: "Reintentar",
+    download: "Descargar vídeo",
+    review: "Revisar la guía",
+    keepOpen: "No cierres esta pantalla: lo que no se haya enviado se pierde.",
+    states: {
+      pending: "Sin grabar",
+      recorded: (segundos: number) => `Grabada · ${segundos} s`,
+      uploading: (porcentaje: number) => `Enviando… ${porcentaje}%`,
+      processing: "Preparando la parte…",
+      sent: "Lista",
+      failed: "No se pudo enviar",
+    },
+    noiseQuestion: "¿Cómo sonaba?",
+    noise: { quiet: "Tranquilo", medium: "Normal", noisy: "Ruidoso" },
+    tooBig: "El vídeo pesa más de 50 MB y no se puede enviar. Repite esta parte.",
+    unavailable: "Este servidor no puede procesar vídeo ahora. Descarga el vídeo para no perderlo.",
+    deleteFailed: "No se pudo borrar la grabación anterior. Inténtalo de nuevo.",
+    lostPart: "Se borró la grabación anterior pero la nueva no llegó: esa parte no está en la guía.",
   },
   alerts: {
     luz: "Poca luz. Enciende las luces.",
     movimiento: "Más despacio",
-  },
-  revision: {
-    title: "Revisa el vídeo",
-    cannotSend: "Todavía no se puede enviar",
-    retry: "Repetir",
-    send: "Enviar",
-    noAlerts: "Sin avisos de calidad.",
-    interrupted: "La grabación se detuvo porque la app pasó a segundo plano.",
-    limit: "Se alcanzó el límite de 2 minutos.",
-    tooBig: "El vídeo pesa más de 50 MB y no se puede enviar. Repite la grabación.",
-    alertsTitle: "Avisos durante la grabación",
-    darkSegments: (n: number) => plural(n, "tramo oscuro", "tramos oscuros"),
-    fastSegments: (n: number) => plural(n, "tramo rápido", "tramos rápidos"),
-  },
-  enviando: { title: "Enviando el vídeo…", keepOpen: "No cierres esta pantalla." },
-  hecho: {
-    title: "¡Listo!",
-    // Only when the video did NOT get through. Saying it was sent would be a lie, and the person
-    // would lose the only copy, so the download is offered instead.
-    lead: "Se guardó el recorrido con sus partes. El vídeo no se ha enviado: descárgalo para no perderlo.",
-    leadSent: "Se guardó el recorrido y se envió el vídeo. Ya puedes revisar la guía.",
-    review: "Revisar la guía",
-    again: "Grabar otro",
   },
   error: {
     title: "Algo ha fallado",
@@ -150,12 +141,6 @@ export const es = {
     next: "Continuar",
     needParts: "Elige al menos una parte en «Añadir».",
     needVenue: "Escribe el nombre del centro.",
-  },
-  marcar: {
-    action: (parte: string) => `Llegué a: ${parte}`,
-    done: "Todas las partes marcadas",
-    progress: (hechas: number, total: number) => `${hechas} de ${total} partes marcadas`,
-    hint: "Quédate quieto 3 segundos al llegar.",
   },
   panel: {
     title: "Tus guías",

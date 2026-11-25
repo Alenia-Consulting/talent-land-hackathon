@@ -87,51 +87,12 @@ export function RecordingBar({
   );
 }
 
-/** What to do at the next part, said before arriving instead of after. */
-export function CoachCard({ nextPart }: { nextPart: string | null }) {
+/** What is being recorded, and the one instruction that matters. */
+export function CoachCard({ part }: { part: string }) {
   return (
     <div className="absolute inset-x-4 top-20 rounded-3xl bg-niebla/95 p-4 text-tinta">
-      {nextPart ? (
-        <>
-          <p className="text-lg font-bold">{es.grabando.nextPart(nextPart)}</p>
-          <p className="mt-1 text-base text-tinta/70">{es.grabando.nextHint}</p>
-        </>
-      ) : (
-        <p className="text-lg font-bold">{es.grabando.allDone}</p>
-      )}
-    </div>
-  );
-}
-
-/** Where the walk is up to: one dot per part, ticked as each is marked. */
-export function StepRail({ parts, done }: { parts: { title: string }[]; done: number }) {
-  return (
-    <div className="absolute inset-x-0 bottom-4 flex items-start justify-center gap-1 px-3">
-      {parts.map((part, index) => {
-        const complete = index < done;
-        const current = index === done;
-        return (
-          <div key={part.title + index} className="flex min-w-0 flex-1 flex-col items-center gap-1">
-            <span
-              aria-hidden="true"
-              className={`flex h-6 w-6 items-center justify-center rounded-full border-2 text-xs font-bold ${
-                complete
-                  ? "border-[#8fd9c0] bg-[#8fd9c0] text-tinta"
-                  : current
-                    ? "border-niebla bg-niebla text-tinta"
-                    : "border-niebla/50"
-              }`}
-            >
-              {complete ? "✓" : ""}
-            </span>
-            <span
-              className={`w-full truncate text-center text-sm ${current ? "font-bold" : "text-niebla/70"}`}
-            >
-              {part.title}
-            </span>
-          </div>
-        );
-      })}
+      <p className="text-lg font-bold">{es.grabando.part(part)}</p>
+      <p className="mt-1 text-base text-tinta/70">{es.grabando.hint}</p>
     </div>
   );
 }
