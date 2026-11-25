@@ -78,3 +78,18 @@ pytest --cov=. --cov-fail-under=85
 cd ../client
 npm run build && npm test
 ```
+
+## Contributors
+
+| Name | Email |
+|---|---|
+| Abigail Justiniano | [abigail.justiniano@alenia.io](mailto:abigail.justiniano@alenia.io) |
+| Ayyoub Abed | [ayyoub.abed@alenia.io](mailto:ayyoub.abed@alenia.io) |
+| Franco Barrera | [franco.barrera@alenia.io](mailto:franco.barrera@alenia.io) |
+| Franco Gil | [franco.gil@alenia.io](mailto:franco.gil@alenia.io) |
+| Heitor Galindo | [heitor.galindo@alenia.io](mailto:heitor.galindo@alenia.io) |
+| Victor Franco | [victor.franco@alenia.io](mailto:victor.franco@alenia.io) |
+
+## About us
+
+Antesala is built by [Alenia Consulting](https://www.linkedin.com/company/alenia-consulting-espana/).
