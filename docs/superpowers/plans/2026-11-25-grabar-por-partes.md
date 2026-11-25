@@ -64,11 +64,18 @@ def test_duration_refuses_a_file_it_cannot_decode(tmp_path):
         video_io.duration(broken)
 
 
-def test_retiming_stretches_a_step_when_the_file_is_longer(db_session, make_guide):
+# La fixture `make_guide` construye un Guide pelado, sin recorridos ni pasos: una guía con
+# recorridos se construye con el repositorio.
+def _one_take(db_session, seconds: float):
+    return guides.create(db_session, title="Recorrido principal", venue_name="Centro Trinidad",
+                         marks=[{"title": "Entrada", "category": "entrance",
+                                 "marked_at_seconds": 0.0}],
+                         video_duration_seconds=seconds)
+
+
+def test_retiming_stretches_a_step_when_the_file_is_longer(db_session):
     """El reloj del móvil se queda corto al llegar al tope: la cola no se pierde."""
-    guide = make_guide(marks=[{"title": "Entrada", "category": "entrance", "marked_at_seconds": 0.0}],
-                       video_duration_seconds=120.0)
-    route = guide.routes[0]
+    route = _one_take(db_session, 120.0).routes[0]
 
     guides.retime_route(route, 120.4)
 
@@ -76,29 +83,28 @@ def test_retiming_stretches_a_step_when_the_file_is_longer(db_session, make_guid
     assert route.video_duration_seconds == 120.4
 
 
-def test_retiming_shortens_a_step_when_the_file_is_shorter(db_session, make_guide):
-    guide = make_guide(marks=[{"title": "Entrada", "category": "entrance", "marked_at_seconds": 0.0}],
-                       video_duration_seconds=30.0)
+def test_retiming_shortens_a_step_when_the_file_is_shorter(db_session):
+    route = _one_take(db_session, 30.0).routes[0]
 
-    guides.retime_route(guide.routes[0], 18.5)
+    guides.retime_route(route, 18.5)
 
-    assert guide.routes[0].steps[0].end_seconds == 18.5
+    assert route.steps[0].end_seconds == 18.5
 
 
-def test_retiming_puts_the_photo_in_the_middle_of_the_step(db_session, make_guide):
+def test_retiming_puts_the_photo_in_the_middle_of_the_step(db_session):
     """Hoy sale «marca + 1,5 s»: el instante justo después de pulsar Grabar."""
-    guide = make_guide(marks=[{"title": "Entrada", "category": "entrance", "marked_at_seconds": 0.0}],
-                       video_duration_seconds=30.0)
+    route = _one_take(db_session, 30.0).routes[0]
 
-    guides.retime_route(guide.routes[0], 20.0)
+    guides.retime_route(route, 20.0)
 
-    assert guide.routes[0].steps[0].photo_second == 10.0
+    assert route.steps[0].photo_second == 10.0
 
 
-def test_retiming_adds_up_the_duration_of_the_whole_guide(db_session, make_guide):
-    guide = make_guide(..., video_duration_seconds=30.0)
+def test_retiming_adds_up_the_duration_of_the_whole_guide(db_session):
+    guide = _one_take(db_session, 30.0)
     guides.add_route(db_session, guide, title="Recepción",
-                     marks=[{"title": "Recepción", "category": "reception", "marked_at_seconds": 0.0}],
+                     marks=[{"title": "Recepción", "category": "reception",
+                             "marked_at_seconds": 0.0}],
                      video_duration_seconds=30.0)
 
     guides.retime_route(guide.routes[0], 18.0)
@@ -216,8 +222,10 @@ git commit -m "(fix) Rescue a step whose range falls past the end of the recordi
 - [ ] **Step 1: Escribir los tests que fallan**
 
 ```python
-def test_a_route_can_be_inserted_in_a_place_of_its_own(db_session, make_guide):
-    guide = make_guide(route_title="Entrada")
+# `_guide_with_routes(db_session, *titles)`: `guides.create` para la primera y `guides.add_route`
+# para las demás. `make_guide` no sirve, construye un Guide sin recorridos.
+def test_a_route_can_be_inserted_in_a_place_of_its_own(db_session):
+    guide = _guide_with_routes(db_session, "Entrada")
     guides.add_route(db_session, guide, title="Sala", marks=[_mark("Sala")], video_duration_seconds=10)
 
     guides.add_route(db_session, guide, title="Recepción", marks=[_mark("Recepción")],
@@ -227,9 +235,9 @@ def test_a_route_can_be_inserted_in_a_place_of_its_own(db_session, make_guide):
         "Entrada", "Recepción", "Sala"]
 
 
-def test_inserting_renumbers_the_steps_of_the_whole_guide(db_session, make_guide):
+def test_inserting_renumbers_the_steps_of_the_whole_guide(db_session):
     """«paso 3 de 7» tiene que seguir significando algo."""
-    guide = make_guide(route_title="Entrada")
+    guide = _guide_with_routes(db_session, "Entrada")
     guides.add_route(db_session, guide, title="Sala", marks=[_mark("Sala")], video_duration_seconds=10)
     guides.add_route(db_session, guide, title="Recepción", marks=[_mark("Recepción")],
                      video_duration_seconds=10, position=2)
@@ -238,7 +246,7 @@ def test_inserting_renumbers_the_steps_of_the_whole_guide(db_session, make_guide
         (1, "Entrada"), (2, "Recepción"), (3, "Sala")]
 
 
-def test_without_a_position_a_route_still_goes_last(db_session, make_guide):
+def test_without_a_position_a_route_still_goes_last(db_session):
     """Lo que ya existe no cambia de comportamiento."""
 
 
@@ -306,7 +314,7 @@ git commit -m "(feat) Let a route be inserted in a place of its own"
 - [ ] **Step 1: Escribir los tests que fallan**
 
 ```python
-def test_deleting_a_route_takes_its_steps_with_it(db_session, make_guide):
+def test_deleting_a_route_takes_its_steps_with_it(db_session):
     guide = _guide_with_routes(db_session, "Entrada", "Recepción")
 
     guides.delete_route(db_session, guide, guide.routes[0])
@@ -315,7 +323,7 @@ def test_deleting_a_route_takes_its_steps_with_it(db_session, make_guide):
     assert [s.title for s in guide.steps] == ["Recepción"]
 
 
-def test_deleting_a_route_renumbers_what_is_left(db_session, make_guide):
+def test_deleting_a_route_renumbers_what_is_left(db_session):
     """Sin huecos: la numeración es una sola para toda la guía."""
     guide = _guide_with_routes(db_session, "Entrada", "Recepción", "Salida")
 
@@ -470,6 +478,7 @@ git commit -m "(feat) Let the person recording say how a place sounded"
   - `nextToRecord(takes: readonly Take[]): number | null`
   - `canFinish(takes: readonly Take[]): boolean`
   - `recordedCount(takes: readonly Take[]): number`
+  - `sendPlan(take: Take, index: number, guideId: string | null): { kind: "create" } | { kind: "addRoute"; guideId: string; position: number }`
 - Desaparecen: `PAUSE_MS`, `markAt`, `whyNotSendable`.
 
 - [ ] **Step 1: Escribir los tests que fallan** en `client/test/takes.test.ts`
@@ -483,6 +492,14 @@ test("al empezar, todas las partes están pendientes y la primera es la que toca
 
 test("la siguiente que toca es la primera pendiente, aunque se grabara fuera de orden", () => {
   // El orden lo marca la lista, no el momento de grabar: permitirlo es menos código que prohibirlo.
+});
+
+test("con una guía ya creada, la siguiente toma se añade y nunca se vuelve a crear", () => {
+  // Crear la guía otra vez dejaría una duplicada en el panel del centro, con la mitad de los
+  // pasos en cada una.
+  assert.deepEqual(sendPlan(recorded(RECEPCION), 1, "g1"),
+                   { kind: "addRoute", guideId: "g1", position: 2 });
+  assert.deepEqual(sendPlan(recorded(ENTRADA), 0, null), { kind: "create" });
 });
 
 test("se puede terminar con una sola toma grabada", () => {
@@ -565,14 +582,9 @@ La lista del diseño: una fila por parte con su estado, la acción «Grabar» en
 
 - [ ] **Step 5: Escribir el test del reintento y hacerlo pasar**
 
-```ts
-test("reintentar la primera toma no crea una segunda guía", () => {
-  // La guía ya existe desde el primer envío: crearla otra vez dejaría una duplicada en el panel
-  // del centro, con la mitad de los pasos en cada una.
-  const after = sentFirstTake(takes, { guideId: "g1", routeId: "r1" });
-  assert.equal(guideIdFor(after), "g1");
-});
-```
+La regla vive en `sendPlan` (Tarea 6) y ya está probada allí. Aquí se comprueba que la pantalla
+la usa: tras un envío con éxito, el `guideId` queda guardado y el siguiente envío pasa por
+`addRoute`, nunca por `createGuide`.
 
 - [ ] **Step 6: «Terminar» no se queda esperando**
 
