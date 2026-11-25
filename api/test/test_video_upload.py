@@ -359,3 +359,14 @@ def test_a_mark_past_the_real_end_of_the_file_is_still_processed(
     db_session.refresh(guide)
     assert [(s.start_seconds, s.end_seconds) for s in guide.routes[0].steps] == [
         (0.0, 5.0), (4.0, 5.0)]
+
+
+def test_why_a_recording_failed_is_logged(client, db_session, make_guide, caplog):
+    guide = make_guide()
+    db_session.add(guide)
+    db_session.commit()
+
+    with caplog.at_level("WARNING", logger="uvicorn.error"):
+        upload(client, guide.id, content=b"not really a video" * 50)
+
+    assert "processing failed" in caplog.text

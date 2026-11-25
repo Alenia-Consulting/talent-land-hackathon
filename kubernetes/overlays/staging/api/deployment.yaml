@@ -28,7 +28,7 @@ spec:
     spec:
       containers:
         - name: talent-land-hackathon-api
-          image: ghcr.io/alenia-consulting/talent-land-hackathon-api:0.0.18
+          image: ghcr.io/alenia-consulting/talent-land-hackathon-api:0.0.19
           ports:
             - containerPort: 8000
           readinessProbe:
@@ -42,11 +42,12 @@ spec:
             # waits (a portrait phone recording costs more, around 2-3x). Memory peaked around 150 MB.
             # One recording is processed at a time (a lock in media/pipeline.py), so a second upload
             # waits for the first.
+            # Raised 15 % over 1000m/512Mi requests and 2000m/1Gi limits for headroom.
             requests:
-              cpu: "1000m"
-              memory: "512Mi"
+              cpu: "1150m"
+              memory: "589Mi"
             limits:
-              cpu: "2000m"
-              memory: "1Gi"
+              cpu: "2300m"
+              memory: "1178Mi"
       imagePullSecrets:
         - name: github-registry-alenia-secret
