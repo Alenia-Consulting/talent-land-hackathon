@@ -42,7 +42,10 @@ test("form carries only the video, with the right extension", async () => {
 });
 
 type FakeXhr = {
-  upload: { onprogress?: (e: { lengthComputable: boolean; loaded: number; total: number }) => void };
+  upload: {
+    onprogress?: (e: { lengthComputable: boolean; loaded: number; total: number }) => void;
+    onload?: () => void;
+  };
   status: number;
   responseText: string;
   sent?: unknown;
@@ -82,6 +85,21 @@ test("upload POSTs the video to the guide and reports progress", async () => {
   assert.deepEqual(xhr.opened, ["POST", "/api/guides/guide-1/video"]);
   assert.ok(xhr.sent instanceof FormData);
   assert.deepEqual(progress, [0.25]);
+});
+
+test("the last byte sent is reported before the server answers", async () => {
+  // POST /video answers only after processing: the bar must know the upload ended without the 200.
+  const progress: number[] = [];
+  let answered = false;
+  const xhr = fakeXhr((x) => {
+    x.upload.onload?.();
+    assert.deepEqual(progress, [1]);
+    answered = true;
+    x.status = 200;
+    x.onload?.();
+  });
+  await uploadVideo("g", input, (f) => progress.push(f), () => xhr as unknown as XMLHttpRequest);
+  assert.ok(answered);
 });
 
 const failWith = (finish: (x: FakeXhr) => void) =>

@@ -88,6 +88,9 @@ export function uploadVideo(
     xhr.upload.onprogress = (event) => {
       if (event.lengthComputable) onProgress(event.loaded / event.total);
     };
+    // Every byte has left, even where progress was not computable. The response comes later:
+    // the server answers only once it has processed the video.
+    xhr.upload.onload = () => onProgress(1);
     xhr.onload = () => {
       if (xhr.status >= 200 && xhr.status < 300) resolve();
       else reject(new VideoUploadError(xhr.status, readDetail(xhr.status, xhr.responseText)));
