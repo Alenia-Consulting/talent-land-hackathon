@@ -504,6 +504,13 @@ export interface components {
              * @description pending | processing | done | failed: where this recording is.
              */
             processing_status: string;
+            /**
+             * Ai Usage
+             * @description Tokens Gemini billed for this video: calls, prompt, output, thinking, total and the prompt split by video/image/text. Null when it was not processed with Gemini.
+             */
+            ai_usage: {
+                [key: string]: unknown;
+            } | null;
         };
         /** StepOut */
         StepOut: {

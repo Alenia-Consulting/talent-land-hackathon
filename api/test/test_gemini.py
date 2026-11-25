@@ -365,3 +365,82 @@ def test_the_panel_cannot_save_points_the_front_could_not_draw(
     response = client.patch(f"/guides/{guide.id}/steps/{step_id}", json={"points_of_interest": bad})
 
     assert response.status_code == 422
+
+
+def with_usage(response, *, prompt, output, thinking=0, video=0, image=0):
+    response["usageMetadata"] = {
+        "promptTokenCount": prompt,
+        "candidatesTokenCount": output,
+        "thoughtsTokenCount": thinking,
+        "totalTokenCount": prompt + output + thinking,
+        "promptTokensDetails": [
+            {"modality": "VIDEO", "tokenCount": video},
+            {"modality": "IMAGE", "tokenCount": image},
+            {"modality": "TEXT", "tokenCount": prompt - video - image},
+        ],
+    }
+    return response
+
+
+def test_tokens_are_summed_over_every_call_of_a_video():
+    usage = gemini.Usage()
+    text = with_usage(answer(), prompt=1000, output=80, thinking=20, video=900)
+    points = with_usage(points_answer(point()), prompt=400, output=30, image=300)
+
+    gemini.describe_steps([request(1), request(2)], send=fake_gemini(text, points), usage=usage)
+
+    # Two steps, each one text call and one points call.
+    assert usage.calls == 4
+    assert usage.prompt_tokens == 2 * (1000 + 400)
+    assert usage.output_tokens == 2 * (80 + 30)
+    assert usage.thinking_tokens == 2 * 20
+    assert usage.by_modality == {"video": 1800, "image": 600, "text": 2 * (100 + 100)}
+    assert usage.as_dict()["model"] == gemini.DEFAULT_MODEL
+
+
+def test_an_answer_without_usage_still_counts_the_call():
+    usage = gemini.Usage()
+
+    gemini.describe_step(request(), send=lambda *_: answer(), usage=usage)
+
+    assert usage.calls == 1
+    assert usage.total_tokens == 0
+
+
+def test_a_blocked_answer_was_still_paid_for():
+    usage = gemini.Usage()
+    blocked = {"candidates": [], "usageMetadata": {"promptTokenCount": 500, "totalTokenCount": 500}}
+
+    with pytest.raises(gemini.GeminiError):
+        gemini.describe_step(request(), send=lambda *_: blocked, usage=usage)
+
+    assert usage.prompt_tokens == 500
+
+
+def test_the_usage_of_a_video_is_kept_on_its_route_and_in_the_log(
+    client, db_session, make_guide, make_step, monkeypatch, tmp_path, caplog
+):
+    guide = stored_guide(db_session, make_guide, make_step, monkeypatch, tmp_path)
+    text = with_usage(answer(), prompt=1000, output=80, video=900)
+    points = with_usage(points_answer(point()), prompt=400, output=30, image=300)
+    monkeypatch.setattr("ai.gemini._send", fake_gemini(text, points))
+
+    with caplog.at_level("INFO", logger="uvicorn.error"):
+        response = upload(client, guide.id)
+
+    route = response.json()["routes"][0]
+    assert route["ai_usage"]["prompt_tokens"] == 1400
+    assert route["ai_usage"]["output_tokens"] == 110
+    assert route["ai_usage"]["steps"] == 1
+    assert "gemini usage" in caplog.text and "1400" in caplog.text
+
+
+def test_a_video_processed_without_gemini_has_no_usage(
+    client, db_session, make_guide, make_step, monkeypatch, tmp_path
+):
+    guide = stored_guide(db_session, make_guide, make_step, monkeypatch, tmp_path)
+    monkeypatch.delenv("GEMINI_API_KEY")
+
+    response = upload(client, guide.id)
+
+    assert response.json()["routes"][0]["ai_usage"] is None

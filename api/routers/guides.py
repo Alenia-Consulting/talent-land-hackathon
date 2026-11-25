@@ -5,6 +5,7 @@ Mounted under root_path="/api", so these routes are served as /api/guides and /a
 Routes never touch the ORM: every read and write goes through db.guides.
 """
 
+import logging
 import pathlib
 import tempfile
 import uuid
@@ -21,6 +22,8 @@ from media import pipeline, storage
 from schemas import GuideCreate, GuideOut, GuideSummary, Pending, RouteCreate, StepPatch
 
 router = APIRouter(tags=["guides"])
+# uvicorn configures this one, so the usage line reaches the Pod log without extra setup.
+logger = logging.getLogger("uvicorn.error")
 
 # Same text whether the guide does not exist or is still a draft: a visitor who guesses a slug
 # learns nothing about work in progress.
@@ -58,7 +61,9 @@ def _with_pending(guide: Guide) -> GuideOut:
     return detail
 
 
-def _write_texts(by_position: dict, processed: list[pipeline.ProcessedStep]) -> None:
+def _write_texts(
+    by_position: dict, processed: list[pipeline.ProcessedStep], route: Route
+) -> None:
     """Gemini drafts the text of each step from its blurred clip.
 
     A step Gemini cannot describe keeps its text empty, which already blocks publishing until
@@ -75,7 +80,12 @@ def _write_texts(by_position: dict, processed: list[pipeline.ProcessedStep]) -> 
         for item in processed
         if item.position in by_position
     ]
-    for position, text in gemini.describe_steps(requests).items():
+    usage = gemini.Usage()
+    results = gemini.describe_steps(requests, usage=usage)
+    if usage.calls:
+        route.ai_usage = {**usage.as_dict(), "steps": len(requests)}
+        logger.info("gemini usage route=%s %s", route.id, route.ai_usage)
+    for position, text in results.items():
         if text is None:
             continue
         step = by_position[position]
@@ -241,7 +251,11 @@ def upload_video(
     Kept for the recorder, which sends one video per guide. See the route version below.
     """
     guide = _load(session, guide_id)
-    return _ingest(session, guide, guides.latest_route(guide), video)
+    route = guides.latest_route(guide)
+    # A guide older than routes gets its route here; saved now, or the rollback that follows
+    # when processing starts would throw it away.
+    session.commit()
+    return _ingest(session, guide, route, video)
 
 
 @router.post("/guides/{guide_id}/routes/{route_id}/video", response_model=GuideOut)
@@ -305,7 +319,7 @@ def _ingest(session: Session, guide: Guide, route: Route, video: UploadFile) -> 
             if item.noise_level is not None:
                 step.noise_level = item.noise_level
                 step.noise_level_source = "measured"
-        _write_texts(by_position, processed)
+        _write_texts(by_position, processed, route)
         route.processing_status = "done"
         guide.processing_status = "done"
         session.commit()

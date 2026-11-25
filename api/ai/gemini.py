@@ -16,6 +16,7 @@ import urllib.request
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
+from threading import Lock
 
 from db.models import MAX_POINTS, POINT_KINDS, STEP_INTERESTS
 
@@ -43,6 +44,54 @@ Send = Callable[[str, dict, dict[str, str]], dict]
 
 class GeminiError(RuntimeError):
     """Gemini was unreachable, refused the request, or answered something unusable."""
+
+
+class Usage:
+    """Tokens Gemini billed while processing one video, summed over every call.
+
+    Steps run in parallel threads, so the counters are guarded. `by_modality` says how much of the
+    input was video, image or text: the clip is what costs, and this is where that shows.
+    """
+
+    def __init__(self) -> None:
+        self._lock = Lock()
+        self.calls = 0
+        self.prompt_tokens = 0
+        self.output_tokens = 0
+        self.thinking_tokens = 0
+        self.total_tokens = 0
+        self.by_modality: dict[str, int] = {}
+
+    def add(self, metadata: object) -> None:
+        """Record the `usageMetadata` of one answer. A missing or odd one still counts the call."""
+        meta = metadata if isinstance(metadata, dict) else {}
+        with self._lock:
+            self.calls += 1
+            self.prompt_tokens += _count(meta.get("promptTokenCount"))
+            self.output_tokens += _count(meta.get("candidatesTokenCount"))
+            self.thinking_tokens += _count(meta.get("thoughtsTokenCount"))
+            self.total_tokens += _count(meta.get("totalTokenCount"))
+            for detail in meta.get("promptTokensDetails") or []:
+                if isinstance(detail, dict) and isinstance(detail.get("modality"), str):
+                    name = detail["modality"].lower()
+                    self.by_modality[name] = self.by_modality.get(name, 0) + _count(
+                        detail.get("tokenCount")
+                    )
+
+    def as_dict(self) -> dict:
+        return {
+            "model": model_name(),
+            "calls": self.calls,
+            "prompt_tokens": self.prompt_tokens,
+            "output_tokens": self.output_tokens,
+            "thinking_tokens": self.thinking_tokens,
+            "total_tokens": self.total_tokens,
+            "prompt_tokens_by_modality": dict(self.by_modality),
+        }
+
+
+def _count(value: object) -> int:
+    return value if isinstance(value, int) and value > 0 else 0
 
 
 @dataclass
@@ -249,7 +298,12 @@ def parse_points(raw: str) -> list[dict]:
 
 
 def _generate(
-    key: str, parts: list[dict], schema: dict, send: Send | None, temperature: float = 0.2
+    key: str,
+    parts: list[dict],
+    schema: dict,
+    send: Send | None,
+    temperature: float = 0.2,
+    usage: Usage | None = None,
 ) -> str:
     body = {
         "contents": [{"parts": parts}],
@@ -261,6 +315,9 @@ def _generate(
     }
     url = ENDPOINT.format(model=model_name())
     answer = (send or _send)(url, body, {"x-goog-api-key": key, "Content-Type": "application/json"})
+    # Before reading the text: a blocked or unparseable answer was still paid for.
+    if usage is not None:
+        usage.add(answer.get("usageMetadata") if isinstance(answer, dict) else None)
     try:
         return answer["candidates"][0]["content"]["parts"][0]["text"]
     except (KeyError, IndexError, TypeError) as error:
@@ -275,7 +332,9 @@ def _key() -> str:
     return key
 
 
-def locate_points(request: StepRequest, *, send: Send | None = None) -> list[dict]:
+def locate_points(
+    request: StepRequest, *, send: Send | None = None, usage: Usage | None = None
+) -> list[dict]:
     """Ask Gemini where to point on the step's photo. Static frames give far better boxes than
     a moving clip, which is why the points belong to the photo and not to the video."""
     key = _key()
@@ -292,10 +351,12 @@ def locate_points(request: StepRequest, *, send: Send | None = None) -> list[dic
                          "data": base64.b64encode(request.photo).decode()}},
         {"text": prompt},
     ]
-    return parse_points(_generate(key, parts, POINTS_SCHEMA, send, temperature=0.1))
+    return parse_points(_generate(key, parts, POINTS_SCHEMA, send, temperature=0.1, usage=usage))
 
 
-def describe_step(request: StepRequest, *, send: Send | None = None) -> StepText:
+def describe_step(
+    request: StepRequest, *, send: Send | None = None, usage: Usage | None = None
+) -> StepText:
     """Ask Gemini to write one step from its clip."""
     key = _key()
     if len(request.clip) > MAX_CLIP_BYTES:
@@ -313,11 +374,11 @@ def describe_step(request: StepRequest, *, send: Send | None = None) -> StepText
                          "data": base64.b64encode(request.clip).decode()}},
         {"text": prompt},
     ]
-    return parse(_generate(key, parts, SCHEMA, send))
+    return parse(_generate(key, parts, SCHEMA, send, usage=usage))
 
 
 def describe_steps(
-    requests: list[StepRequest], *, send: Send | None = None
+    requests: list[StepRequest], *, send: Send | None = None, usage: Usage | None = None
 ) -> dict[int, StepText | None]:
     """Write every step at once. A step that fails maps to None; the others are not affected.
 
@@ -326,11 +387,11 @@ def describe_steps(
 
     def one(request: StepRequest) -> StepText | None:
         try:
-            text = describe_step(request, send=send)
+            text = describe_step(request, send=send, usage=usage)
         except GeminiError:
             return None
         try:
-            text.points_of_interest = locate_points(request, send=send)
+            text.points_of_interest = locate_points(request, send=send, usage=usage)
         except GeminiError:
             pass
         return text
