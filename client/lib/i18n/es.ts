@@ -6,9 +6,28 @@ const plural = (n: number, one: string, many: string): string => `${n} ${n === 1
 
 export const es = {
   home: {
-    record: "Grabar un recorrido",
     tagline: "Que ninguna visita sea la primera.",
+    lead: "Mira un sitio por dentro antes de ir: los pasos, las fotos y el ruido real, contados en lectura fácil.",
+    promise: "Cada recorrido lo graba una persona del centro y lo revisa antes de publicarlo.",
+    // The door asks what you came to do, never who you are. Nothing here, and nothing stored,
+    // describes the person: see the rule at the top of lib/pure/prefs.ts.
+    visitor: "Voy a ir a un sitio",
+    visitorLead: "Mira cómo es antes de ir.",
+    venue: "Soy del centro",
+    venueLead: "Graba y publica un recorrido.",
+    back: "Volver al inicio",
+    backShort: "Volver",
+    record: "Grabar un recorrido",
     recordLead: "2 minutos con el móvil. Te guiamos.",
+  },
+  // La parte del centro: quien graba y quien revisa. No la ve nadie que venga de visita.
+  centro: {
+    title: "Tu centro",
+    lead: "Graba un recorrido nuevo o revisa los que ya tienes.",
+    guidesLead: "Revisa, corrige y publica.",
+    check: "Comprobar la conexión",
+    checking: "Comprobando…",
+    checkNote: "Comprobación técnica, para quien mantiene la app.",
   },
   intro: {
     step: "Paso 1 de 3",
@@ -408,5 +427,22 @@ export const es = {
     locked: "No se puede desactivar",
     close: "Cerrar los ajustes",
     open: "Ajustes",
+  },
+  buscar: {
+    title: "¿A qué sitio vas?",
+    lead: "Busca el sitio y mira cómo es antes de ir.",
+    fieldLabel: "Escribe el nombre del sitio",
+    placeholder: "Hospital, centro de salud, museo…",
+    loading: "Cargando los sitios…",
+    error: "No pudimos cargar los sitios.",
+    errorServer: "El servidor no respondió bien.",
+    retry: "Reintentar",
+    empty: "Todavía no hay ningún recorrido publicado.",
+    emptyLead: "Cuando un centro publique el suyo, aparecerá aquí.",
+    noMatch: "No encontramos ningún sitio con ese nombre.",
+    noMatchLead: "Revisa cómo se escribe, o mira todos los sitios.",
+    showAll: "Ver todos los sitios",
+    walking: (n: number) => `${n} min andando`,
+    count: (n: number) => plural(n, "recorrido", "recorridos"),
   },
 } as const;

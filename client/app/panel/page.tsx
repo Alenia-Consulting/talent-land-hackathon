@@ -13,7 +13,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { ApiError, deleteGuide, type GuideSummary, listGuides } from "../../lib/guides.ts";
 import { es } from "../../lib/i18n/es.ts";
 import { AntesalaMark, DotsIcon, SearchIcon, VideoIcon } from "../icons.tsx";
-import { Button, Card, StatusChip } from "../ui.tsx";
+import { BackLink, Button, Card, StatusChip } from "../ui.tsx";
 
 const t = es.panel;
 
@@ -264,6 +264,7 @@ export default function PanelPage() {
   return (
     <main className="mx-auto max-w-5xl px-4 py-6">
       <header className="mb-8 flex items-center gap-3 border-b border-tinta/10 pb-5">
+        <BackLink href="/centro" label={es.home.backShort} />
         <span className="text-pino">
           <AntesalaMark size={36} />
         </span>

@@ -217,3 +217,31 @@ def test_the_listing_carries_the_title_but_not_the_steps(client):
 
     assert row["title"] == "Recorrido principal"
     assert "steps" not in row
+
+
+def test_the_catalogue_is_served_and_not_read_as_a_slug(client, db_session, make_guide):
+    """/public/guides no puede quedar tapada por /public/{slug}."""
+    db_session.add(make_guide(venue_name="Centro Trinidad", status="published"))
+    db_session.commit()
+
+    response = client.get("/public/guides")
+
+    assert response.status_code == 200, response.text
+    assert [g["venue_name"] for g in response.json()] == ["Centro Trinidad"]
+
+
+def test_the_catalogue_never_shows_a_draft(client, db_session, make_guide):
+    db_session.add(make_guide(venue_name="Centro en borrador", status="draft"))
+    db_session.commit()
+
+    assert client.get("/public/guides").json() == []
+
+
+def test_the_catalogue_says_nothing_about_the_state_of_the_work(client, db_session, make_guide):
+    db_session.add(make_guide(status="published"))
+    db_session.commit()
+
+    entry = client.get("/public/guides").json()[0]
+
+    assert set(entry) == {"title", "venue_name", "public_slug", "cover_photo_url",
+                          "walking_minutes", "reviewed_at", "language"}

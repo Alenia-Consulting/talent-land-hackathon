@@ -25,7 +25,7 @@ test("the committed types match the published contract", () => {
 test("the contract still describes the endpoints the app depends on", () => {
   const types = readFileSync("lib/api-types.ts", "utf8");
 
-  for (const path of ["/guides", "/guides/{guide_id}", "/public/{slug}"]) {
+  for (const path of ["/guides", "/guides/{guide_id}", "/public/{slug}", "/public/guides"]) {
     assert.ok(types.includes(`"${path}"`), `the contract no longer has ${path}: ${REGENERATE}`);
   }
 });

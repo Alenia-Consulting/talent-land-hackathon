@@ -229,3 +229,43 @@ def test_listing_shows_the_most_recent_guides_first(db_session):
     db_session.flush()
 
     assert [g.venue_name for g in guides.list_guides(db_session)] == ["Segundo", "Primero"]
+
+
+def test_the_catalogue_only_has_published_guides(db_session, make_guide):
+    db_session.add_all([
+        make_guide(venue_name="Centro A", status="published"),
+        make_guide(venue_name="Centro B", status="draft"),
+        make_guide(venue_name="Centro C", status="needs_review"),
+    ])
+    db_session.commit()
+
+    assert [g.venue_name for g in guides.list_published(db_session)] == ["Centro A"]
+
+
+def test_the_catalogue_is_alphabetical_so_it_can_be_browsed(db_session, make_guide):
+    for venue, title in (("Hospital Sur", "Urgencias"), ("Centro Trinidad", "Principal"),
+                         ("Hospital Sur", "Consultas")):
+        db_session.add(make_guide(venue_name=venue, title=title, status="published"))
+    db_session.commit()
+
+    assert [(g.venue_name, g.title) for g in guides.list_published(db_session)] == [
+        ("Centro Trinidad", "Principal"),
+        ("Hospital Sur", "Consultas"),
+        ("Hospital Sur", "Urgencias"),
+    ]
+
+
+def test_a_published_guide_without_a_slug_stays_out_of_the_catalogue(db_session, make_guide):
+    db_session.add(make_guide(venue_name="Centro sin enlace", status="published", public_slug=None))
+    db_session.commit()
+
+    assert guides.list_published(db_session) == []
+
+
+def test_the_catalogue_is_one_page_at_a_time(db_session, make_guide):
+    for n in range(3):
+        db_session.add(make_guide(venue_name=f"Centro {n}", status="published"))
+    db_session.commit()
+
+    assert len(guides.list_published(db_session, limit=2)) == 2
+    assert [g.venue_name for g in guides.list_published(db_session, limit=2, offset=2)] == ["Centro 2"]

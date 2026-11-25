@@ -177,6 +177,28 @@ def list_guides(
     return list(session.scalars(statement))
 
 
+def list_published(
+    session: Session, *, limit: int = DEFAULT_PAGE_SIZE, offset: int = 0
+) -> list[Guide]:
+    """One page of the public catalogue: the guides a visitor is allowed to browse.
+
+    Alphabetical by venue, not newest first. This is a catalogue somebody reads looking for a
+    place they already have in mind, not a feed of what happened lately.
+
+    A guide with no slug cannot be opened, so it stays out instead of becoming a card that leads
+    nowhere. Nothing shortens that list but publishing, which always assigns one; the filter is
+    here so one bad row cannot take the whole catalogue down with it.
+    """
+    statement = (
+        select(Guide)
+        .where(Guide.status == "published", Guide.public_slug.is_not(None))
+        .order_by(Guide.venue_name, Guide.title)
+        .limit(limit)
+        .offset(offset)
+    )
+    return list(session.scalars(statement))
+
+
 def pending_before_publishing(guide: Guide) -> dict:
     """What the panel shows as "3 de 5 pasos revisados" and "2 datos por completar"."""
     return {

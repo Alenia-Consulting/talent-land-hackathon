@@ -208,6 +208,26 @@ class GuideSummary(BaseModel):
     updated_at: datetime
 
 
+class PublicGuideSummary(BaseModel):
+    """One line of the public catalogue: what somebody looking for a place needs to recognise it.
+
+    Deliberately narrower than GuideSummary. A visitor has nothing to do with `id`, `status` or
+    `processing_status`: those belong to the panel, and a catalogue that carried them would tell
+    anyone who asked how each venue's work is going.
+    """
+
+    model_config = ConfigDict(from_attributes=True)
+
+    title: str
+    venue_name: str
+    public_slug: str = Field(description="Segment of the public URL, as in /g?slug=...")
+    cover_photo_url: str | None
+    walking_minutes: int | None = Field(description="How long the whole route takes on foot.")
+    reviewed_at: datetime | None = Field(
+        description="Last human review. The public guide always shows this date.")
+    language: str
+
+
 class GuideOut(GuideSummary):
     routes: list[RouteOut] = Field(description="The guide's recordings, in order.")
     steps: list[StepOut]

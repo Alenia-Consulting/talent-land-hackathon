@@ -103,9 +103,3 @@ h3 {
     animation: none;
   }
 }
-
-.health {
-  display: grid;
-  justify-items: center;
-  gap: 0.5rem;
-}

@@ -19,7 +19,15 @@ from db.models import Guide, Route
 from db.session import get_session
 from ai import gemini
 from media import pipeline, storage
-from schemas import GuideCreate, GuideOut, GuideSummary, Pending, RouteCreate, StepPatch
+from schemas import (
+    GuideCreate,
+    GuideOut,
+    GuideSummary,
+    Pending,
+    PublicGuideSummary,
+    RouteCreate,
+    StepPatch,
+)
 
 router = APIRouter(tags=["guides"])
 # uvicorn configures this one, so the usage line reaches the Pod log without extra setup.
@@ -186,6 +194,22 @@ def publish_guide(guide_id: uuid.UUID, session: Session = Depends(get_session)) 
         raise HTTPException(status_code=409, detail=str(error)) from error
     session.commit()
     return _with_pending(guide)
+
+
+@router.get("/public/guides", response_model=list[PublicGuideSummary])
+def list_public_guides(
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+    session: Session = Depends(get_session),
+) -> list[PublicGuideSummary]:
+    """The catalogue a visitor browses when nobody sent them a link or showed them a QR.
+
+    Declared BEFORE /public/{slug}: FastAPI answers with the first route that matches, and the
+    slug one would take this request and reply "guide not found".
+
+    A larger page than the panel's: this one is read whole, not paged through.
+    """
+    return guides.list_published(session, limit=limit, offset=offset)
 
 
 @router.get("/public/{slug}", response_model=GuideOut)

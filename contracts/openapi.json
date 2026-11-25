@@ -301,6 +301,67 @@
         }
       }
     },
+    "/public/guides": {
+      "get": {
+        "tags": [
+          "guides"
+        ],
+        "summary": "List Public Guides",
+        "description": "The catalogue a visitor browses when nobody sent them a link or showed them a QR.\n\nDeclared BEFORE /public/{slug}: FastAPI answers with the first route that matches, and the\nslug one would take this request and reply \"guide not found\".\n\nA larger page than the panel's: this one is read whole, not paged through.",
+        "operationId": "list_public_guides_public_guides_get",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PublicGuideSummary"
+                  },
+                  "title": "Response List Public Guides Public Guides Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/public/{slug}": {
       "get": {
         "tags": [
@@ -1052,6 +1113,75 @@
         ],
         "title": "PointOfInterest",
         "description": "Something on the step's photo worth pointing at, to help a visitor find their way."
+      },
+      "PublicGuideSummary": {
+        "properties": {
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "venue_name": {
+            "type": "string",
+            "title": "Venue Name"
+          },
+          "public_slug": {
+            "type": "string",
+            "title": "Public Slug",
+            "description": "Segment of the public URL, as in /g?slug=..."
+          },
+          "cover_photo_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Photo Url"
+          },
+          "walking_minutes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Walking Minutes",
+            "description": "How long the whole route takes on foot."
+          },
+          "reviewed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reviewed At",
+            "description": "Last human review. The public guide always shows this date."
+          },
+          "language": {
+            "type": "string",
+            "title": "Language"
+          }
+        },
+        "type": "object",
+        "required": [
+          "title",
+          "venue_name",
+          "public_slug",
+          "cover_photo_url",
+          "walking_minutes",
+          "reviewed_at",
+          "language"
+        ],
+        "title": "PublicGuideSummary",
+        "description": "One line of the public catalogue: what somebody looking for a place needs to recognise it.\n\nDeliberately narrower than GuideSummary. A visitor has nothing to do with `id`, `status` or\n`processing_status`: those belong to the panel, and a catalogue that carried them would tell\nanyone who asked how each venue's work is going."
       },
       "RouteCreate": {
         "properties": {
