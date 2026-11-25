@@ -119,6 +119,10 @@ def _renumber(guide: Guide) -> None:
     with session.no_autoflush:
         routes = sorted(guide.routes, key=lambda one: one.position)
         steps = [step for one in routes for step in sorted(one.steps, key=lambda s: s.position)]
+    # DO NOT REMOVE. uq_steps_guide_id_position and uq_routes_guide_id_position are plain UNIQUE,
+    # which Postgres checks per statement, so shifting 1->2, 2->3 collides. Park every row at a
+    # negative position and flush first. SQLite cannot reproduce the collision: a green test run
+    # is not evidence that this step can go.
     for index, row in enumerate([*routes, *steps], start=1):
         row.position = -index
     session.flush()
