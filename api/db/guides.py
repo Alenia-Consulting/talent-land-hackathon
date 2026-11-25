@@ -26,6 +26,8 @@ DEFAULT_PAGE_SIZE = 20
 # is in the middle of that pause, and that is also the stretch where the noise is measured.
 PAUSE_SECONDS = 3.0
 MIN_MARKS = 1
+# The shortest clip a step keeps when its mark lands past the end of the file.
+MIN_STEP_SECONDS = 1.0
 
 
 def create(
@@ -98,15 +100,20 @@ def retime_route(route: Route, measured_seconds: float) -> None:
 
     The phone sends the wall-clock time between Record and Stop, which is not the length of the
     file: the encoder usually ends earlier. Each step still starts where its mark says and runs
-    until the next one; the last runs to the end of the file, and nothing goes past it.
+    until the next one; the last runs to the end of the file, and nothing goes past it. No step
+    is shorter than MIN_STEP_SECONDS (or the whole file, if that is shorter).
     """
     steps = sorted(route.steps, key=lambda step: step.position)
+    floor = min(MIN_STEP_SECONDS, measured_seconds)
     for step, following in zip(steps, [*steps[1:], None], strict=False):
         step.start_seconds = min(step.start_seconds, measured_seconds)
         step.end_seconds = (
             measured_seconds if following is None
             else min(following.start_seconds, measured_seconds)
         )
+        if step.end_seconds - step.start_seconds < floor:
+            # A mark past the real end keeps a short clip at the tail; the end never moves.
+            step.start_seconds = max(0.0, step.end_seconds - floor)
         step.photo_second = (step.start_seconds + step.end_seconds) / 2
     route.video_duration_seconds = measured_seconds
     route.guide.video_duration_seconds = sum(

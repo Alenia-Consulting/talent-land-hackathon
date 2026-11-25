@@ -324,4 +324,24 @@ def test_retiming_chains_the_steps_and_clamps_marks_past_the_end(db_session):
     guides.retime_route(guide.routes[0], 20.0)
 
     steps = guide.routes[0].steps
-    assert [(s.start_seconds, s.end_seconds) for s in steps] == [(0.0, 12.0), (12.0, 20.0), (20.0, 20.0)]
+    assert [(s.start_seconds, s.end_seconds) for s in steps] == [(0.0, 12.0), (12.0, 20.0), (19.0, 20.0)]
+
+
+def test_a_mark_past_the_end_keeps_a_short_clip_at_the_tail(db_session):
+    """The file is shorter than the phone's clock: the last part was marked after it ended."""
+    guide = create(db_session)  # marks at 0, 12 and 30
+
+    guides.retime_route(guide.routes[0], 12.0)
+
+    last = guide.routes[0].steps[-1]
+    assert (last.start_seconds, last.end_seconds) == (11.0, 12.0)
+    assert last.photo_second == 11.5
+
+
+def test_a_file_shorter_than_the_floor_is_the_whole_step(db_session):
+    route = _one_take(db_session, 30.0).routes[0]
+
+    guides.retime_route(route, 0.4)
+
+    step = route.steps[0]
+    assert (step.start_seconds, step.end_seconds) == (0.0, 0.4)

@@ -334,3 +334,25 @@ def test_a_recording_that_cannot_be_measured_marks_the_route_failed(
     db_session.refresh(guide)
     assert guide.routes[0].processing_status == "failed"
     assert list(tmp_path.iterdir()) == []
+
+
+def test_a_mark_past_the_real_end_of_the_file_is_still_processed(
+    client, db_session, monkeypatch, tmp_path
+):
+    """The part marked at 12 s of a 5 s file keeps its last second instead of failing the upload."""
+    guide = _two_part_guide(db_session)
+    monkeypatch.setattr("routers.guides.UPLOAD_DIR", tmp_path)
+    monkeypatch.setattr(video_io, "duration", lambda video: 5.0)
+    monkeypatch.setattr("media.pipeline.process", lambda video, steps: [
+        pipeline.ProcessedStep(position=n, clip=b"c", photo=b"p", sound=None, noise_level=None)
+        for n in (1, 2)])
+    monkeypatch.setattr("media.storage.config_from_env",
+                        lambda: storage.StorageConfig(url="https://p.supabase.co", key="k"))
+    monkeypatch.setattr("media.storage.upload", lambda config, path, *a, **kw: path)
+
+    response = upload(client, guide.id)
+
+    assert response.status_code == 200, response.text
+    db_session.refresh(guide)
+    assert [(s.start_seconds, s.end_seconds) for s in guide.routes[0].steps] == [
+        (0.0, 5.0), (4.0, 5.0)]
