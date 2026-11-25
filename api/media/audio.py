@@ -42,16 +42,25 @@ BAND_DB = 2.5
 
 
 def _decode(video: pathlib.Path, start: float, duration: float, extra: list[str]) -> bytes | None:
-    """The first audio track of [start, start + duration) through `extra`, or None without one."""
-    command = [
-        video_io.ffmpeg_exe(), "-v", "error", "-ss", str(max(0.0, start)), "-t", str(duration),
-        "-i", str(video), "-map", "0:a:0", "-vn", "-ac", "1", "-ar", str(SAMPLE_RATE), *extra, "pipe:1",
-    ]  # fmt: skip
-    try:
-        done = subprocess.run(command, capture_output=True, timeout=120, check=False)
-    except (OSError, subprocess.TimeoutExpired):
-        return None
-    return done.stdout if done.returncode == 0 and done.stdout else None
+    """The first audio track of [start, start + duration) through `extra`, or None without one.
+
+    Jumps to `start` first; if that finds nothing (a browser recording has no index to jump with)
+    it decodes from the beginning instead, like video_io.read_frames does for the picture.
+    """
+    seek = ["-ss", str(max(0.0, start)), "-t", str(duration)]
+    tail = ["-map", "0:a:0", "-vn", "-ac", "1", "-ar", str(SAMPLE_RATE), *extra, "pipe:1"]
+    for jump in (True, False):
+        before, after = (seek, []) if jump else ([], seek)
+        command = [video_io.ffmpeg_exe(), "-v", "error", *before, "-i", str(video), *after, *tail]
+        try:
+            done = subprocess.run(command, capture_output=True, timeout=120, check=False)
+        except (OSError, subprocess.TimeoutExpired):
+            return None
+        if done.returncode == 0 and done.stdout:
+            return done.stdout
+        if start <= 0:
+            break
+    return None
 
 
 def sound_for_listening(video: pathlib.Path, start: float, end: float) -> bytes | None:

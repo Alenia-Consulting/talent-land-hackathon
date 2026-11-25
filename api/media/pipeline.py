@@ -96,7 +96,13 @@ def _process_step(video: pathlib.Path, size: video_io.Size, step: StepTiming, wo
                 photo_frame = frame
 
     if photo_frame is None:
-        raise ProcessingFailed(f"el paso {step.position} no tiene imagen en el vídeo")
+        real = video_io.duration(video)
+        detail = (
+            f": empieza en {step.start_seconds:.1f} s y el vídeo dura {real:.1f} s"
+            if real is not None
+            else ""
+        )
+        raise ProcessingFailed(f"el paso {step.position} no tiene imagen en el vídeo{detail}")
     encoded, jpeg = cv2.imencode(".jpg", photo_frame, [cv2.IMWRITE_JPEG_QUALITY, JPEG_QUALITY])
     if not encoded:
         raise ProcessingFailed(f"no se pudo guardar la foto del paso {step.position}")
