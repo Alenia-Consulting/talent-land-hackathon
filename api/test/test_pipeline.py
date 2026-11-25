@@ -110,3 +110,17 @@ def test_a_rescued_step_gets_a_clip_with_frames_in_it(tmp_path):
     steps = [pipeline.StepTiming(position=1, start_seconds=5.0, end_seconds=6.0, photo_second=5.5)]
 
     assert len(frames_of(pipeline.process(video, steps)[0].clip, tmp_path)) > 0
+
+
+def test_the_file_is_only_measured_when_a_step_needs_rescuing(tmp_path, monkeypatch):
+    """Measuring decodes the whole file: a recording whose steps all have frames must not pay for it."""
+    video = make_video(tmp_path / "in.mp4", seconds=4)
+    calls = []
+    measure = video_io.duration
+    monkeypatch.setattr(video_io, "duration", lambda path: calls.append(path) or measure(path))
+
+    pipeline.process(video, STEPS)
+    assert calls == []
+
+    pipeline.process(video, [pipeline.StepTiming(1, 30.0, 31.0, 30.5)])
+    assert len(calls) == 1

@@ -87,21 +87,22 @@ def _process_step(video: pathlib.Path, size: video_io.Size, step: StepTiming, wo
     photo_frame = None
 
     with video_io.clip_writer(clip_path, size) as write:
-        # The range can lie past the end of the file (guides recorded before the duration was
-        # measured): the step keeps the last second of the recording rather than losing the walk.
-        last_second = max(0.0, video_io.duration(video) - 1.0)
-        for start, length, wanted in (
-            (step.start_seconds, step.end_seconds - step.start_seconds, photo_index),
-            (last_second, 1.0, None),
-        ):
-            for index, frame in enumerate(video_io.read_frames(video, size, start, length)):
+        length = step.end_seconds - step.start_seconds
+        for index, frame in enumerate(video_io.read_frames(video, size, step.start_seconds, length)):
+            blur(frame)
+            write(frame)
+            # The frame at photo_second, or the last one when the clip ends before it.
+            if photo_frame is None or index <= photo_index:
+                photo_frame = frame
+        if photo_frame is None:
+            # The range lies past the end of the file (guides recorded before the duration was
+            # measured): keep the last second of the recording rather than losing the walk.
+            # Measuring decodes the whole file, so only this path pays for it.
+            last_second = max(0.0, video_io.duration(video) - 1.0)
+            for frame in video_io.read_frames(video, size, last_second, 1.0):
                 blur(frame)
                 write(frame)
-                # The frame at photo_second, or the last one when the clip ends before it.
-                if photo_frame is None or wanted is None or index <= wanted:
-                    photo_frame = frame
-            if photo_frame is not None:
-                break
+                photo_frame = frame
 
     if photo_frame is None:
         raise ProcessingFailed(f"el paso {step.position} no tiene imagen en el vídeo")
