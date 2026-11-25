@@ -74,12 +74,15 @@ def client(db_session):
     main.app.dependency_overrides.clear()
 
 
+# Longer than any step a test writes, so retiming leaves the test's own timings alone.
+UNMEASURABLE_UPLOAD_SECONDS = 1000.0
+
+
 @pytest.fixture(autouse=True)
 def measurable_upload(monkeypatch):
     """Upload tests send placeholder bytes, which no decoder can measure.
 
-    A real video is measured for real; bytes that are not a video get a length longer than any
-    step, so the steps keep the timings the test gave them.
+    A real video is measured for real; bytes that are not a video get a stand-in length.
     """
     from media import video_io
     from media.errors import ProcessingFailed
@@ -90,6 +93,6 @@ def measurable_upload(monkeypatch):
         try:
             return real(video)
         except ProcessingFailed:
-            return 1000.0
+            return UNMEASURABLE_UPLOAD_SECONDS
 
-    monkeypatch.setattr("routers.guides.video_io", type("VideoIo", (), {"duration": staticmethod(duration)}))
+    monkeypatch.setattr(video_io, "duration", duration)
