@@ -70,6 +70,8 @@ def test_the_video_of_a_route_only_touches_that_route(client, monkeypatch, tmp_p
     guide = add_route(client, create_guide(client).json()["id"]).json()
     second = guide["routes"][1]
     monkeypatch.setattr("routers.guides.UPLOAD_DIR", tmp_path)
+    monkeypatch.setenv("SUPABASE_URL", "https://p.supabase.co")
+    monkeypatch.delenv("SUPABASE_BUCKET", raising=False)
     seen = []
 
     def process(video, steps):
