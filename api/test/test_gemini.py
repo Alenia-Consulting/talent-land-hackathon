@@ -29,8 +29,23 @@ def key(monkeypatch):
     monkeypatch.delenv("GEMINI_MODEL", raising=False)
 
 
-def request(position=1):
-    return gemini.StepRequest(position=position, title="Recepción", category="reception", clip=CLIP)
+PHOTO = b"photo bytes"
+
+
+def request(position=1, photo=PHOTO):
+    return gemini.StepRequest(
+        position=position, title="Recepción", category="reception", clip=CLIP, photo=photo)
+
+
+def points_answer(*points):
+    return {"candidates": [{"content": {"parts": [{"text": json.dumps({"points": list(points)})}]}}]}
+
+
+def point(**fields):
+    values = {"label": "Entrada de cristal", "kind": "door", "box_2d": [300, 100, 700, 400],
+              "description": "Busca las puertas de cristal. Cruza por la abertura para entrar."}
+    values.update(fields)
+    return values
 
 
 def test_the_clip_and_the_rules_go_to_gemini():
@@ -137,6 +152,17 @@ def test_http_errors_become_gemini_errors(monkeypatch):
         gemini.describe_step(request())
 
 
+def fake_gemini(text_answer, points=None):
+    """Answer the text request (a video) and the points request (an image) differently."""
+    points = points_answer(point()) if points is None else points
+
+    def send(url, body, headers):
+        parts = body["contents"][0]["parts"]
+        return points if parts[0]["inline_data"]["mime_type"] == "image/jpeg" else text_answer
+
+    return send
+
+
 def stored_guide(db_session, make_guide, make_step, monkeypatch, tmp_path):
     guide = make_guide()
     guide.steps = [make_step(position=1, title="Recepción", category="reception", easy_read_text=None)]
@@ -156,8 +182,7 @@ def test_the_draft_text_lands_on_the_step_with_its_blanks_listed(
     client, db_session, make_guide, make_step, monkeypatch, tmp_path
 ):
     guide = stored_guide(db_session, make_guide, make_step, monkeypatch, tmp_path)
-    monkeypatch.setattr(
-        "ai.gemini._send", lambda *_: answer(who_to_ask_for_help=None))
+    monkeypatch.setattr("ai.gemini._send", fake_gemini(answer(who_to_ask_for_help=None)))
 
     response = upload(client, guide.id)
 
@@ -204,7 +229,7 @@ def test_editing_a_step_leaves_the_original_ai_draft_untouched(
     client, db_session, make_guide, make_step, monkeypatch, tmp_path
 ):
     guide = stored_guide(db_session, make_guide, make_step, monkeypatch, tmp_path)
-    monkeypatch.setattr("ai.gemini._send", lambda *_: answer())
+    monkeypatch.setattr("ai.gemini._send", fake_gemini(answer()))
     step_id = upload(client, guide.id).json()["steps"][0]["id"]
 
     edited = client.patch(f"/guides/{guide.id}/steps/{step_id}", json={"easy_read_text": "Texto corregido."})
@@ -224,3 +249,119 @@ def test_a_step_gemini_could_not_describe_has_no_draft(
 
     db_session.refresh(guide)
     assert guide.steps[0].ai_draft is None
+
+
+def test_valid_points_are_kept_with_their_boxes():
+    points = gemini.parse_points(json.dumps({"points": [point()]}))
+
+    assert points == [point()]
+
+
+def test_points_a_person_could_not_be_shown_are_dropped():
+    raw = json.dumps({"points": [
+        point(box_2d=[0, 0, 1000, 1000]),          # the whole room
+        point(box_2d=[500, 500, 505, 510]),        # a speck
+        point(box_2d=[700, 100, 300, 400]),        # upside down
+        point(box_2d=[1, 2, 3]),                   # not a box
+        point(label="  "),                         # nothing to show
+        point(description=""),                     # nothing to read aloud
+        point(label="Mesa", kind="table", box_2d=[-50, 100, 400, 1200]),  # clamped, kept
+    ]})
+
+    points = gemini.parse_points(raw)
+
+    assert [p["label"] for p in points] == ["Mesa"]
+    assert points[0]["box_2d"] == [0, 100, 400, 1000]
+
+
+def test_an_unknown_kind_becomes_other_and_there_are_at_most_three_points():
+    points = gemini.parse_points(json.dumps({"points": [point(kind="fountain")] + [point()] * 5}))
+
+    assert len(points) == 3
+    assert points[0]["kind"] == "other"
+
+
+def test_points_are_asked_from_the_photo_not_the_clip():
+    sent = {}
+
+    def send(url, body, headers):
+        sent.update(body=body)
+        return points_answer(point())
+
+    points = gemini.locate_points(request(), send=send)
+
+    parts = sent["body"]["contents"][0]["parts"]
+    assert parts[0]["inline_data"]["mime_type"] == "image/jpeg"
+    assert "NUNCA sobre una persona" in parts[1]["text"]
+    assert "en voz alta" in parts[1]["text"]
+    assert points[0]["box_2d"] == [300, 100, 700, 400]
+
+
+def test_without_a_photo_no_points_are_asked():
+    assert gemini.locate_points(request(photo=b""), send=lambda *_: pytest.fail("no")) == []
+
+
+@pytest.mark.parametrize("raw", ["not json", "[]", json.dumps({"other": 1})])
+def test_points_that_are_not_the_expected_json_are_refused(raw):
+    with pytest.raises(gemini.GeminiError):
+        gemini.parse_points(raw)
+
+
+def test_a_step_keeps_its_text_when_only_the_points_fail():
+    def send(url, body, headers):
+        if body["contents"][0]["parts"][0]["inline_data"]["mime_type"] == "image/jpeg":
+            raise gemini.GeminiError("boom")
+        return answer()
+
+    result = gemini.describe_steps([request()], send=send)
+
+    assert result[1].easy_read_text
+    assert result[1].points_of_interest == []
+
+
+def test_the_points_land_on_the_step_and_in_the_original_draft(
+    client, db_session, make_guide, make_step, monkeypatch, tmp_path
+):
+    guide = stored_guide(db_session, make_guide, make_step, monkeypatch, tmp_path)
+    monkeypatch.setattr("ai.gemini._send", fake_gemini(answer()))
+
+    response = upload(client, guide.id)
+
+    assert response.json()["steps"][0]["points_of_interest"] == [point()]
+    db_session.refresh(guide)
+    assert guide.steps[0].ai_draft["points_of_interest"] == [point()]
+
+
+def test_the_venue_can_correct_the_points_and_the_draft_stays(
+    client, db_session, make_guide, make_step, monkeypatch, tmp_path
+):
+    guide = stored_guide(db_session, make_guide, make_step, monkeypatch, tmp_path)
+    monkeypatch.setattr("ai.gemini._send", fake_gemini(answer()))
+    step_id = upload(client, guide.id).json()["steps"][0]["id"]
+    url = f"/guides/{guide.id}/steps/{step_id}"
+
+    fixed = client.patch(url, json={"points_of_interest": [point(label="Puerta principal")]})
+    cleared = client.patch(url, json={"points_of_interest": []})
+
+    assert fixed.json()["steps"][0]["points_of_interest"][0]["label"] == "Puerta principal"
+    assert cleared.json()["steps"][0]["points_of_interest"] == []
+    db_session.refresh(guide)
+    assert guide.steps[0].ai_draft["points_of_interest"] == [point()]
+
+
+@pytest.mark.parametrize("bad", [
+    [point(box_2d=[700, 100, 300, 400])],
+    [point(box_2d=[0, 0, 1001, 10])],
+    [point(kind="fountain")],
+    [point()] * 4,
+])
+def test_the_panel_cannot_save_points_the_front_could_not_draw(
+    client, db_session, make_guide, make_step, monkeypatch, tmp_path, bad
+):
+    guide = stored_guide(db_session, make_guide, make_step, monkeypatch, tmp_path)
+    monkeypatch.setattr("ai.gemini._send", fake_gemini(answer()))
+    step_id = upload(client, guide.id).json()["steps"][0]["id"]
+
+    response = client.patch(f"/guides/{guide.id}/steps/{step_id}", json={"points_of_interest": bad})
+
+    assert response.status_code == 422

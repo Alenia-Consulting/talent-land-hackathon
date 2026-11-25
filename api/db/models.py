@@ -112,6 +112,11 @@ STEP_CATEGORIES = (
     "other",
 )
 NOISE_LEVELS = ("quiet", "medium", "noisy")
+# What the visitor can be pointed at on the step's photo.
+POINT_KINDS = (
+    "exit", "door", "window", "table", "counter", "restroom", "ramp", "rest_area", "other",
+)
+MAX_POINTS = 3
 NOISE_LEVEL_SOURCES = ("measured", "manual")
 # Drives the "Que quieres ver antes?" filter on the public guide.
 STEP_INTERESTS = ("where_to_wait", "noisy_areas", "restrooms", "who_to_ask", "exit")
@@ -169,6 +174,14 @@ class Step(TimestampMixin, Base):
     duration_text: Mapped[str | None] = mapped_column(String(80))
     category: Mapped[str] = mapped_column(String(20), nullable=False)
     interests: Mapped[list[str]] = mapped_column(StringList, nullable=False, default=list)
+
+    # Up to MAX_POINTS things worth pointing at on the photo, for the visitor to be oriented:
+    # [{"label", "description", "kind", "box_2d": [ymin, xmin, ymax, xmax]}], box_2d from 0 to 1000
+    # of the photo's height and width (Gemini's format, independent of the screen size). The front
+    # pauses the clip at `photo_second` and draws them over it, and reads `description` aloud.
+    points_of_interest: Mapped[list[dict]] = mapped_column(
+        JsonDocument, nullable=False, default=list, server_default="[]"
+    )
 
     # What the AI wrote, as it wrote it: {"model", "generated_at", and the five text fields}. The
     # fields above are what a person then edited, so this is the only copy of the original draft.

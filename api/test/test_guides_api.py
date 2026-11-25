@@ -82,6 +82,7 @@ def test_the_api_speaks_the_contract(client):
         "duration_text",
         "category",
         "interests",
+        "points_of_interest",
         "missing_fields",
         "reviewed",
         "clip_url",
