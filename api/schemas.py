@@ -127,6 +127,10 @@ class StepOut(BaseModel):
         description="Face-blurred still frame of this part.")
     sound_available: bool = Field(
         description="Whether the low-pass filtered ambience exists. It never plays on its own.")
+    sound_url: str | None = Field(
+        validation_alias="sound_path",
+        description="The ambience of this part, low-pass filtered so voices cannot be understood. "
+                    "Null when the recording had no usable audio. It never plays on its own.")
     noise_level: str | None = Field(
         description="Relative to the rest of the video, never decibels: the phone mic is not "
                     "calibrated. Null until measured.",
@@ -136,7 +140,7 @@ class StepOut(BaseModel):
     pictogram_url: str | None = Field(description="ARASAAC pictogram (CC BY-NC-SA).")
 
 
-    @field_validator("clip_url", "photo_url", mode="after")
+    @field_validator("clip_url", "photo_url", "sound_url", mode="after")
     @classmethod
     def _as_public_url(cls, path: str | None) -> str | None:
         return storage.public_url(path)

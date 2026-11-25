@@ -25,11 +25,11 @@ import pathlib
 import tempfile
 import threading
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 import cv2
 
-from media import video_io
+from media import audio, video_io
 from media.errors import ProcessingFailed, ProcessingUnavailable
 from media.faces import FaceBlurrer
 
@@ -71,7 +71,12 @@ def process(video: pathlib.Path, steps: Sequence[StepTiming]) -> list[ProcessedS
     """
     with _processing, tempfile.TemporaryDirectory() as workdir:
         size = video_io.target_size(video)
-        return [_process_step(video, size, step, pathlib.Path(workdir)) for step in steps]
+        processed = [_process_step(video, size, step, pathlib.Path(workdir)) for step in steps]
+        # The level of a place only means something next to the others of the same recording.
+        levels = audio.classify(
+            {step.position: audio.mean_power(video, step.start_seconds, step.end_seconds) for step in steps}
+        )
+        return [replace(item, noise_level=levels[item.position]) for item in processed]
 
 
 def _process_step(video: pathlib.Path, size: video_io.Size, step: StepTiming, workdir: pathlib.Path) -> ProcessedStep:
@@ -100,6 +105,6 @@ def _process_step(video: pathlib.Path, size: video_io.Size, step: StepTiming, wo
         position=step.position,
         clip=clip_path.read_bytes(),
         photo=jpeg.tobytes(),
-        sound=None,
+        sound=audio.sound_for_listening(video, step.start_seconds, step.end_seconds),
         noise_level=None,
     )

@@ -88,6 +88,7 @@ def test_the_api_speaks_the_contract(client):
         "clip_url",
         "photo_url",
         "sound_available",
+        "sound_url",
         "noise_level",
         "noise_level_source",
         "pictogram_url",

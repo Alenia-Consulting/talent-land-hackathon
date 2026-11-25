@@ -229,7 +229,7 @@ def upload_video(
             step.clip_path = storage.upload(config, f"{base}.mp4", item.clip, "video/mp4")
             step.photo_path = storage.upload(config, f"{base}.jpg", item.photo, "image/jpeg")
             if item.sound is not None:
-                storage.upload(config, f"{base}.mp3", item.sound, "audio/mpeg")
+                step.sound_path = storage.upload(config, f"{base}.mp3", item.sound, "audio/mpeg")
                 step.sound_available = True
             if item.noise_level is not None:
                 step.noise_level = item.noise_level
