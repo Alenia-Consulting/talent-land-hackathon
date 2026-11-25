@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 from db import guides
 from db.models import Guide
 from db.session import get_session
+from ai import gemini
 from media import pipeline, storage
 from schemas import GuideCreate, GuideOut, GuideSummary, Pending, StepPatch
 
@@ -54,6 +55,34 @@ def _with_pending(guide: Guide) -> GuideOut:
     detail = GuideOut.model_validate(guide)
     detail.pending = Pending(**guides.pending_before_publishing(guide))
     return detail
+
+
+def _write_texts(by_position: dict, processed: list[pipeline.ProcessedStep]) -> None:
+    """Gemini drafts the text of each step from its blurred clip.
+
+    A step Gemini cannot describe keeps its text empty, which already blocks publishing until
+    the venue writes it: the media is what matters here, so this never fails the upload.
+    """
+    requests = [
+        gemini.StepRequest(
+            position=item.position,
+            title=by_position[item.position].title,
+            category=by_position[item.position].category,
+            clip=item.clip,
+        )
+        for item in processed
+        if item.position in by_position
+    ]
+    for position, text in gemini.describe_steps(requests).items():
+        if text is None:
+            continue
+        step = by_position[position]
+        step.easy_read_text = text.easy_read_text
+        step.what_to_expect = text.what_to_expect
+        step.who_to_ask_for_help = text.who_to_ask_for_help
+        step.duration_text = text.duration_text
+        step.interests = text.interests
+        step.missing_fields = text.missing_fields
 
 
 def _set_processing_status(session: Session, guide: Guide, status: str) -> None:
@@ -197,6 +226,7 @@ def upload_video(
             if item.noise_level is not None:
                 step.noise_level = item.noise_level
                 step.noise_level_source = "measured"
+        _write_texts(by_position, processed)
         guide.processing_status = "done"
         session.commit()
     except pipeline.ProcessingUnavailable as error:
