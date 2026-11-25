@@ -1013,6 +1013,18 @@
             "title": "Sound Available",
             "description": "Whether the low-pass filtered ambience exists. It never plays on its own."
           },
+          "sound_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sound Url",
+            "description": "The ambience of this part, low-pass filtered so voices cannot be understood. Null when the recording had no usable audio. It never plays on its own."
+          },
           "noise_level": {
             "anyOf": [
               {
@@ -1070,6 +1082,7 @@
           "clip_url",
           "photo_url",
           "sound_available",
+          "sound_url",
           "noise_level",
           "noise_level_source",
           "pictogram_url"

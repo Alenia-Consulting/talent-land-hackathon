@@ -132,18 +132,13 @@ export function readPublicGuide(slug: string, fetchImpl?: typeof fetch): Promise
 }
 
 /**
- * The URL of a step's ambience, or null while there is none.
+ * The URL of a step's ambience, or null when there is none.
  *
- * THE CONTRACT DOES NOT CARRY THIS FIELD YET. `StepOut` has `sound_available` (a boolean) but no
- * `sound_url`, so today the API says a sound exists without saying where it is. The media
- * pipeline already uploads the file to Supabase as `{slug}/paso-{n}.mp3`; what is missing is one
- * column and one line in `schemas.py` to publish its URL, which belongs with the pipeline work.
- *
- * Until then this returns null, every "Escuchar el sitio" button stays hidden and nothing claims
- * to play a sound it cannot reach. Delete the cast the day the field lands.
+ * `sound_available` says whether a sound exists and `sound_url` where it is: the recording's audio
+ * with the voices filtered out. A step that says it has a sound without a URL gets no button, so
+ * nothing claims to play something it cannot reach.
  */
 export function soundUrlOf(step: Step): string | null {
   if (!step.sound_available) return null;
-  const url = (step as Step & { sound_url?: string | null }).sound_url;
-  return typeof url === "string" && url.length > 0 ? url : null;
+  return typeof step.sound_url === "string" && step.sound_url.length > 0 ? step.sound_url : null;
 }

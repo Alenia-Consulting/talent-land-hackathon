@@ -172,6 +172,8 @@ def test_the_processed_media_reaches_storage_and_the_steps(
     db_session.refresh(guide)
     assert guide.steps[0].clip_path == f"{guide.id}/paso-1.mp4"
     assert step["sound_available"] is True
+    assert step["sound_url"] == f"{base}/{guide.id}/paso-1.mp3"
+    assert guide.steps[0].sound_path == f"{guide.id}/paso-1.mp3"
     assert step["noise_level"] == "noisy"
     # Measured by the pipeline, not corrected by a person: the panel shows the difference.
     assert step["noise_level_source"] == "measured"

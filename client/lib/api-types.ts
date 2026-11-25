@@ -485,6 +485,11 @@ export interface components {
              */
             sound_available: boolean;
             /**
+             * Sound Url
+             * @description The ambience of this part, low-pass filtered so voices cannot be understood. Null when the recording had no usable audio. It never plays on its own.
+             */
+            sound_url: string | null;
+            /**
              * Noise Level
              * @description Relative to the rest of the video, never decibels: the phone mic is not calibrated. Null until measured.
              */

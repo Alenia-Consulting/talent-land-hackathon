@@ -197,6 +197,8 @@ class Step(TimestampMixin, Base):
     # from them, so a new storage domain or a private bucket does not mean rewriting rows.
     clip_path: Mapped[str | None] = mapped_column(Text)
     photo_path: Mapped[str | None] = mapped_column(Text)
+    # The low-pass filtered ambience of the step, when the recording had usable audio.
+    sound_path: Mapped[str | None] = mapped_column(Text)
     sound_available: Mapped[bool] = mapped_column(
         Boolean, nullable=False, server_default=false()
     )

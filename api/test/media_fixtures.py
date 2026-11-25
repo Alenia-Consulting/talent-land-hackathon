@@ -17,16 +17,29 @@ def face_frame(width: int = 640, height: int = 360) -> np.ndarray:
 
 
 def make_video(
-    path: pathlib.Path, *, seconds: int = 4, size: tuple[int, int] = (640, 360), rotate: bool = False
+    path: pathlib.Path,
+    *,
+    seconds: int = 4,
+    size: tuple[int, int] = (640, 360),
+    rotate: bool = False,
+    sound: str | None = None,
 ) -> pathlib.Path:
-    """An mp4 of that face standing still. `rotate` stores a 90 degree rotation, like a phone does."""
+    """An mp4 of that face standing still. `rotate` stores a 90 degree rotation, like a phone does.
+
+    `sound` is an ffmpeg lavfi audio source ("sine=f=300", "anoisesrc=..."), possibly followed by a
+    filter after a "|" ("anoisesrc=a=0.5|volume=0.1"); without it the video has no audio track.
+    """
     still = path.with_suffix(".png")
     cv2.imwrite(str(still), face_frame(*size))
     straight = path if not rotate else path.with_name(path.stem + "-straight.mp4")
     ffmpeg = video_io.ffmpeg_exe()
+    source, _, audio_filter = (sound or "").partition("|")
+    audio_input = ["-f", "lavfi", "-i", source] if sound else []
+    audio_output = ["-c:a", "aac", *(["-af", audio_filter] if audio_filter else [])] if sound else []
     subprocess.run(
-        [ffmpeg, "-y", "-loglevel", "error", "-loop", "1", "-i", str(still), "-t", str(seconds),
-         "-r", "15", "-pix_fmt", "yuv420p", "-c:v", "libx264", str(straight)],
+        [ffmpeg, "-y", "-loglevel", "error", "-loop", "1", "-i", str(still), *audio_input,
+         "-t", str(seconds), "-r", "15", "-pix_fmt", "yuv420p", "-c:v", "libx264", *audio_output,
+         str(straight)],
         check=True,
     )  # fmt: skip
     if rotate:
