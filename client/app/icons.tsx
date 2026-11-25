@@ -30,6 +30,17 @@ function Icon({ children, size = 24 }: { children: ReactNode; size?: number }) {
 
 export type IconProps = { size?: number };
 
+/** Three dots: the menu of a row. Filled, because a stroke this small disappears. */
+export function DotsIcon({ size }: IconProps) {
+  return (
+    <Icon size={size}>
+      <circle cx="5" cy="12" r="1.6" fill="currentColor" />
+      <circle cx="12" cy="12" r="1.6" fill="currentColor" />
+      <circle cx="19" cy="12" r="1.6" fill="currentColor" />
+    </Icon>
+  );
+}
+
 /** Sound of the place. Never shown without the words that say what will play. */
 export function VolumeIcon({ size }: IconProps) {
   return (

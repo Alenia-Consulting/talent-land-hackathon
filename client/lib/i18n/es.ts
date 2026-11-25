@@ -168,6 +168,7 @@ export const es = {
     edit: "Editar",
     statuses: { draft: "Borrador", needs_review: "Por revisar", published: "Publicada" },
     // Borrar es para siempre: la pregunta lo dice con esas palabras y dice qué más se va.
+    more: (guia: string) => `Más opciones de ${guia}`,
     delete: {
       action: "Borrar",
       title: (guia: string) => `¿Borrar «${guia}» para siempre?`,
