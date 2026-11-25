@@ -7,7 +7,7 @@ import { RECORDING } from "../../lib/config.ts";
 import { ApiError, createGuide, type Mark } from "../../lib/guides.ts";
 import { es } from "../../lib/i18n/es.ts";
 import type { AlertType } from "../../lib/pure/alerts.ts";
-import { markAt, whyNotSendable } from "../../lib/pure/marks.ts";
+import { markAt, PAUSE_MS, whyNotSendable } from "../../lib/pure/marks.ts";
 import { downloadGuide, type GuideInput, uploadVideo, VideoUploadError } from "../../lib/upload.ts";
 import { useAlertLog } from "../../lib/useAlertLog.ts";
 import { useCamera } from "../../lib/useCamera.ts";
@@ -137,12 +137,21 @@ export default function GrabarPage() {
 
   const pending = plan ? plan.parts.slice(marks.length) : [];
 
+  // After each "Llegué" the person stands still PAUSE_MS for a clear photo and a sound sample,
+  // so "Parar" cannot cut the recording until that pause is over.
+  const [stillPause, setStillPause] = useState(false);
+  const stillTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  useEffect(() => () => clearTimeout(stillTimer.current), []);
+
   /** "Llegué a: X" — the second of the recording where this part begins. */
   const markArrival = () => {
     const part = pending[0];
     if (!part) return;
     setMarks([...marks, markAt(part, performance.now() - t0.current)]);
     navigator.vibrate?.(60);
+    setStillPause(true);
+    clearTimeout(stillTimer.current);
+    stillTimer.current = setTimeout(() => setStillPause(false), PAUSE_MS);
   };
 
   const guide = (): GuideInput | null => {
@@ -255,7 +264,13 @@ export default function GrabarPage() {
             {es.marcar.action(pending[0].title)}
           </ActionButton>
         )}
-        <ActionButton tone="dark" variant="danger" onClick={() => recorder.stop("user")}>
+        <ActionButton
+          key={marks.length} // a new mark restarts the fill from grey-rose
+          tone="dark"
+          variant="danger"
+          waitMs={stillPause ? PAUSE_MS : undefined}
+          onClick={() => recorder.stop("user")}
+        >
           {es.grabando.stop}
         </ActionButton>
       </>

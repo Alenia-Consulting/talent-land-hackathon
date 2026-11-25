@@ -19,12 +19,15 @@ export function ActionButton({
   variant = "primary",
   disabled,
   tone = "light",
+  waitMs,
 }: {
   children: ReactNode;
   onClick: () => void;
   variant?: "primary" | "secondary" | "danger";
   disabled?: boolean;
   tone?: "light" | "dark";
+  /** Locked for this long, filling into its colour. Not `disabled`: that would fade it to 45 %. */
+  waitMs?: number;
 }) {
   const colors =
     tone === "dark"
@@ -41,9 +44,11 @@ export function ActionButton({
   return (
     <button
       type="button"
-      onClick={onClick}
+      onClick={waitMs ? undefined : onClick}
       disabled={disabled}
-      className={`min-h-14 flex-1 rounded-[18px] px-6 text-lg font-bold disabled:opacity-45 ${colors}`}
+      aria-disabled={waitMs ? true : undefined}
+      style={waitMs ? { animationDuration: `${waitMs}ms` } : undefined}
+      className={`min-h-14 flex-1 rounded-[18px] px-6 text-lg font-bold disabled:opacity-45 ${colors} ${waitMs ? "parar-espera" : ""}`}
     >
       {children}
     </button>

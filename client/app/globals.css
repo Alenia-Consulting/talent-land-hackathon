@@ -14,6 +14,7 @@
   --color-sobre-ambar: #7a4b00; /* text on an amber surface */
   --color-coral: #c24e33; /* recording only */
   --color-sobre-coral: #9c3a22; /* text on a coral surface */
+  --color-gris-rosa: #866d72; /* coral not yet available (white text on it stays AA) */
 
   /* The -loaded variables come from next/font in app/layout.tsx. The fallbacks keep the layout
      sane if a font never arrives. Atkinson Hyperlegible Next was drawn for legibility, which is
@@ -79,6 +80,27 @@ h3 {
   *::after {
     animation-duration: 0.01ms !important;
     transition-duration: 0.01ms !important;
+  }
+}
+
+/* "Parar" right after a "Llegué": the person is standing still, so the button is locked and fills
+   slowly from grey-rose to its coral. Colour only, nothing moves; the duration comes from
+   PAUSE_MS inline. With reduced motion it simply stays grey-rose until it unlocks. */
+.parar-espera {
+  background-color: var(--color-gris-rosa);
+  animation: parar-espera 3s linear forwards;
+}
+@keyframes parar-espera {
+  from {
+    background-color: var(--color-gris-rosa);
+  }
+  to {
+    background-color: var(--color-coral);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .parar-espera {
+    animation: none;
   }
 }
 
