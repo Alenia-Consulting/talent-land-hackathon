@@ -8,11 +8,11 @@
 // same lie as an AI that invents what a room looks like.
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { ApiError, deleteGuide, type GuideSummary, listGuides } from "../../lib/guides.ts";
 import { es } from "../../lib/i18n/es.ts";
-import { AntesalaMark, ChevronRightIcon, SearchIcon, VideoIcon } from "../icons.tsx";
+import { AntesalaMark, DotsIcon, SearchIcon, VideoIcon } from "../icons.tsx";
 import { Button, Card, StatusChip } from "../ui.tsx";
 
 const t = es.panel;
@@ -110,6 +110,73 @@ function Toolbar({
           </button>
         ))}
       </div>
+    </div>
+  );
+}
+
+/**
+ * The "…" of a row: edit and delete, out of the way of the line you read.
+ *
+ * Closes on Escape and on any press outside, so it never stays open over the next row.
+ */
+function RowMenu({
+  guide,
+  onDelete,
+}: {
+  guide: GuideSummary;
+  onDelete: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const root = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const close = (event: Event) => {
+      if (event instanceof KeyboardEvent ? event.key === "Escape" : !root.current?.contains(event.target as Node))
+        setOpen(false);
+    };
+    document.addEventListener("keydown", close);
+    document.addEventListener("pointerdown", close);
+    return () => {
+      document.removeEventListener("keydown", close);
+      document.removeEventListener("pointerdown", close);
+    };
+  }, [open]);
+
+  const item = "flex min-h-12 w-full items-center px-4 text-left text-lg font-bold";
+  return (
+    <div ref={root} className="relative shrink-0">
+      <button
+        type="button"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-label={t.more(guide.title)}
+        onClick={() => setOpen(!open)}
+        className="inline-flex h-12 w-12 items-center justify-center rounded-[18px] text-tinta/70 hover:bg-niebla"
+      >
+        <DotsIcon size={24} />
+      </button>
+      {open && (
+        <div
+          role="menu"
+          className="absolute right-0 z-10 mt-1 w-44 overflow-hidden rounded-2xl border border-tinta/10 bg-tarjeta shadow-lg"
+        >
+          <Link role="menuitem" href={`/panel/guia?id=${guide.id}`} className={`${item} text-tinta`}>
+            {t.edit}
+          </Link>
+          <button
+            type="button"
+            role="menuitem"
+            className={`${item} border-t border-tinta/10 text-tinta`}
+            onClick={() => {
+              setOpen(false);
+              onDelete();
+            }}
+          >
+            {t.delete.action}
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -275,7 +342,7 @@ export default function PanelPage() {
                           a phone, and a list you cannot run your eye down is not a list. */}
                       <Link
                         href={`/panel/guia?id=${guide.id}`}
-                        className="flex items-center gap-4 px-1 py-4"
+                        className="flex min-w-0 flex-1 items-center gap-4 px-1 py-4"
                       >
                         <Thumbnail guide={guide} />
                         <span className="min-w-0 flex-1">
@@ -289,21 +356,8 @@ export default function PanelPage() {
                             </span>
                           </span>
                         </span>
-                        <span className="hidden font-bold text-pino underline sm:inline">
-                          {isPending(guide) ? t.review : t.edit}
-                        </span>
-                        <span aria-hidden="true" className="text-pino">
-                          <ChevronRightIcon size={22} />
-                        </span>
                       </Link>
-                      <button
-                        type="button"
-                        onClick={() => setConfirming(guide.id)}
-                        aria-label={`${t.delete.action} ${guide.title}`}
-                        className="min-h-12 shrink-0 rounded-[18px] px-4 text-base font-bold text-tinta/70 underline"
-                      >
-                        {t.delete.action}
-                      </button>
+                      <RowMenu guide={guide} onDelete={() => setConfirming(guide.id)} />
                     </div>
                   )}
                 </li>
