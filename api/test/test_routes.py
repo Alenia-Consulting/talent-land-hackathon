@@ -94,7 +94,7 @@ def test_the_video_of_a_route_only_touches_that_route(client, monkeypatch, tmp_p
     assert seen == [4, 5]
     body = response.json()
     assert [route["processing_status"] for route in body["routes"]] == ["pending", "done"]
-    assert body["steps"][3]["clip_url"].endswith(f"{guide['id']}/paso-4.mp4")
+    assert body["steps"][3]["clip_url"].endswith(f"{guide['id']}/{body['steps'][3]['id']}.mp4")
     assert body["steps"][0]["clip_url"] is None
 
 
@@ -193,3 +193,47 @@ def test_remove_with_nothing_to_remove_does_not_call_storage(config):
 def test_a_refused_deletion_is_reported(config):
     with pytest.raises(storage.StorageError, match="HTTP 403"):
         storage.remove(config, ["a"], send=lambda *args: 403)
+
+
+def test_a_route_inserted_before_a_processed_one_does_not_overwrite_its_media(
+    client, monkeypatch, tmp_path
+):
+    """Positions move when a route is inserted; the stored media must stay with its own step."""
+    first = create_guide(client).json()
+    guide_id = first["id"]
+    sala = first["steps"][0]
+    monkeypatch.setattr("routers.guides.UPLOAD_DIR", tmp_path)
+    monkeypatch.setattr(
+        "media.storage.config_from_env",
+        lambda: storage.StorageConfig(url="https://p.supabase.co", key="k"),
+    )
+    written = []
+    monkeypatch.setattr(
+        "media.storage.upload",
+        lambda config, path, data, content_type, **kw: written.append(path) or path,
+    )
+
+    def process(video, steps):
+        return [pipeline.ProcessedStep(position=s.position, clip=video.name.encode(), photo=b"p",
+                                       sound=None, noise_level=None) for s in steps]
+
+    monkeypatch.setattr("media.pipeline.process", process)
+
+    def upload(route_id):
+        return client.post(f"/guides/{guide_id}/routes/{route_id}/video",
+                           files={"video": ("r.mp4", io.BytesIO(b"x"), "video/mp4")})
+
+    assert upload(first["routes"][0]["id"]).status_code == 200
+    first_uploads = list(written)
+
+    mark = {"title": "Recepción", "category": "reception", "marked_at_seconds": 0.0}
+    inserted = client.post(f"/guides/{guide_id}/routes", json={
+        "title": "Recepción", "video_duration_seconds": 10, "position": 1, "marks": [mark]}).json()
+    new_route = next(r for r in inserted["routes"] if r["title"] == "Recepción")
+    assert upload(new_route["id"]).status_code == 200
+
+    assert not set(first_uploads) & set(written[len(first_uploads):])  # nothing written twice
+    body = client.get(f"/guides/{guide_id}").json()
+    by_title = {s["title"]: s for s in body["steps"]}
+    assert by_title["Recepción"]["order"] < by_title[sala["title"]]["order"]
+    assert by_title["Recepción"]["clip_url"] != by_title[sala["title"]]["clip_url"]

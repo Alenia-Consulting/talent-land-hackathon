@@ -220,7 +220,7 @@ def test_a_gemini_failure_keeps_the_media_and_leaves_the_text_empty(
     step = response.json()["steps"][0]
     assert response.status_code == 200
     assert response.json()["processing_status"] == "done"
-    assert step["clip_url"].endswith(f"{guide.id}/paso-1.mp4")  # the media is stored regardless
+    assert step["clip_url"].endswith(f"{guide.id}/{step['id']}.mp4")  # the media is stored regardless
     assert step["easy_read_text"] is None
     assert response.json()["pending"]["missing_data"] == 1
 

@@ -336,9 +336,10 @@ def _ingest(session: Session, guide: Guide, route: Route, video: UploadFile) -> 
             step = by_position.get(item.position)
             if step is None:
                 continue
-            # Always the id: the slug only exists once published, and the path must not move then.
-            # Positions are unique across the guide's routes, so two routes never share a path.
-            base = f"{guide.id}/paso-{item.position}"
+            # The guide id, not the slug: the slug only exists once published and the path must not
+            # move then. The step id, not its position: positions move when a route is inserted
+            # before it, and a path built on them would be overwritten by whoever takes the number.
+            base = f"{guide.id}/{step.id}"
             step.clip_path = storage.upload(config, f"{base}.mp4", item.clip, "video/mp4")
             step.photo_path = storage.upload(config, f"{base}.jpg", item.photo, "image/jpeg")
             if item.sound is not None:

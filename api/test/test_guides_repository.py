@@ -418,3 +418,19 @@ def test_the_first_route_is_named_after_the_guide_unless_told_otherwise(db_sessi
                             video_duration_seconds=10)
 
     assert (named.routes[0].title, default.routes[0].title) == ("Entrada", "Guía")
+
+
+def test_steps_are_numbered_walking_the_routes_in_order(db_session):
+    """The rule itself: routes in order and, inside each, its steps in order."""
+    guide = _guide_with_routes(db_session, "Entrada")
+    guides.add_route(db_session, guide, title="Sala", video_duration_seconds=20,
+                     marks=[_mark("Sala A"), {**_mark("Sala B"), "marked_at_seconds": 10.0}])
+
+    guides.add_route(db_session, guide, title="Recepción", video_duration_seconds=20, position=2,
+                     marks=[_mark("Recepción A"), {**_mark("Recepción B"), "marked_at_seconds": 10.0}])
+    db_session.expire_all()
+
+    assert [(s.position, s.title) for s in sorted(guide.steps, key=lambda s: s.position)] == [
+        (1, "Entrada"), (2, "Recepción A"), (3, "Recepción B"), (4, "Sala A"), (5, "Sala B")]
+    assert [(r.position, r.title) for r in sorted(guide.routes, key=lambda r: r.position)] == [
+        (1, "Entrada"), (2, "Recepción"), (3, "Sala")]

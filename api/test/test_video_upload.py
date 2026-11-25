@@ -118,8 +118,9 @@ def test_a_real_recording_is_blurred_before_anything_reaches_storage(
     response = upload(client, guide.id, content=recording)
 
     assert response.status_code == 200, response.text
-    assert set(stored) == {f"{guide.id}/paso-1.mp4", f"{guide.id}/paso-1.jpg"}
-    photo = cv2.imdecode(np.frombuffer(stored[f"{guide.id}/paso-1.jpg"], np.uint8), cv2.IMREAD_COLOR)
+    base = f"{guide.id}/{guide.steps[0].id}"
+    assert set(stored) == {f"{base}.mp4", f"{base}.jpg"}
+    photo = cv2.imdecode(np.frombuffer(stored[f"{base}.jpg"], np.uint8), cv2.IMREAD_COLOR)
     assert faces.find_faces(photo) == []
     assert list((tmp_path / "uploads").iterdir()) == []
 
@@ -162,19 +163,21 @@ def test_the_processed_media_reaches_storage_and_the_steps(
     response = upload(client, guide.id)
 
     assert response.status_code == 200, response.text
-    # The id, not the slug: the slug only exists once published and the path must not move then.
-    assert uploaded == [f"{guide.id}/paso-1.mp4", f"{guide.id}/paso-1.jpg", f"{guide.id}/paso-1.mp3"]
+    # The ids, not the slug or the position: neither is stable once the guide is published or a
+    # route is inserted.
+    stem = f"{guide.id}/{guide.steps[0].id}"
+    assert uploaded == [f"{stem}.mp4", f"{stem}.jpg", f"{stem}.mp3"]
 
     step = response.json()["steps"][0]
     base = "https://p.supabase.co/storage/v1/object/public/guides"
-    assert step["clip_url"] == f"{base}/{guide.id}/paso-1.mp4"
-    assert step["photo_url"] == f"{base}/{guide.id}/paso-1.jpg"
+    assert step["clip_url"] == f"{base}/{stem}.mp4"
+    assert step["photo_url"] == f"{base}/{stem}.jpg"
     # The database keeps the path, not the URL.
     db_session.refresh(guide)
-    assert guide.steps[0].clip_path == f"{guide.id}/paso-1.mp4"
+    assert guide.steps[0].clip_path == f"{stem}.mp4"
     assert step["sound_available"] is True
-    assert step["sound_url"] == f"{base}/{guide.id}/paso-1.mp3"
-    assert guide.steps[0].sound_path == f"{guide.id}/paso-1.mp3"
+    assert step["sound_url"] == f"{base}/{stem}.mp3"
+    assert guide.steps[0].sound_path == f"{stem}.mp3"
     assert step["noise_level"] == "noisy"
     # Measured by the pipeline, not corrected by a person: the panel shows the difference.
     assert step["noise_level_source"] == "measured"
