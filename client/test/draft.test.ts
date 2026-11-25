@@ -37,6 +37,7 @@ test("a draft is the step's fields as strings, never null", () => {
     who_to_ask_for_help: "",
     duration_text: "",
     noise_level: "",
+    points_of_interest: [],
   });
 });
 
@@ -189,4 +190,41 @@ test("merging keeps the order on screen even if the answer reshuffles", () => {
     mergeStep(before, answer, "a").steps.map((one) => one.id),
     ["a", "b"],
   );
+});
+
+const pointOf = (label: string) => ({
+  label,
+  description: "Busca las puertas de cristal.",
+  kind: "door" as const,
+  box_2d: [100, 100, 300, 300],
+});
+
+test("correcting the points sends the whole list, trimmed", () => {
+  const original = step({ points_of_interest: [pointOf("Puerta")] });
+  const draft = { ...draftOf(original), points_of_interest: [pointOf("  Puerta principal ")] };
+
+  assert.deepEqual(changesOf(original, draft), {
+    points_of_interest: [pointOf("Puerta principal")],
+  });
+});
+
+test("deleting every point is a change worth sending", () => {
+  const original = step({ points_of_interest: [pointOf("Puerta")] });
+
+  assert.deepEqual(changesOf(original, { ...draftOf(original), points_of_interest: [] }), {
+    points_of_interest: [],
+  });
+});
+
+test("untouched points are not sent", () => {
+  const original = step({ points_of_interest: [pointOf("Puerta")] });
+
+  assert.equal(changesOf(original, draftOf(original)), null);
+});
+
+test("a point whose name was just emptied waits instead of being refused by the API", () => {
+  const original = step({ points_of_interest: [pointOf("Puerta")] });
+  const draft = { ...draftOf(original), points_of_interest: [pointOf("")] };
+
+  assert.equal(changesOf(original, draft), null);
 });
