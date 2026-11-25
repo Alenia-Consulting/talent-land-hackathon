@@ -6,6 +6,7 @@ import {
   ApiError,
   createGuide,
   deleteGuide,
+  deleteRoute,
   listGuides,
   listPublicGuides,
   patchStep,
@@ -203,4 +204,25 @@ test("listPublicGuides asks for the whole catalogue, not a first page", async ()
 
   assert.equal(calls[0].url, "/api/public/guides?limit=200&offset=0");
   assert.equal(calls[0].method, "GET");
+});
+
+test("deleteRoute pide el borrado de ese recorrido y acepta una respuesta vacía", async () => {
+  const calls: { url: string; method: string }[] = [];
+  const fetchImpl: typeof fetch = async (url, init) => {
+    calls.push({ url: String(url), method: init?.method ?? "GET" });
+    return new Response(null, { status: 204 });
+  };
+
+  await deleteRoute("abc", "r1", fetchImpl);
+
+  assert.equal(calls[0].method, "DELETE");
+  assert.ok(calls[0].url.endsWith("/guides/abc/routes/r1"));
+});
+
+test("deleteRoute cuenta por qué se negó el borrado", async () => {
+  const { fetchImpl } = spy(409, { detail: "No se puede borrar el único recorrido de una guía publicada." });
+
+  await assert.rejects(deleteRoute("abc", "r1", fetchImpl), (error: unknown) => {
+    return error instanceof ApiError && error.status === 409 && /publicada/.test(error.message);
+  });
 });

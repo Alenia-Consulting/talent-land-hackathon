@@ -28,7 +28,9 @@ export function apiUrl(): string {
  * thresholds are compared against.
  */
 export const RECORDING = {
-  maxDurationSec: 120,
+  // One take is one part: an entrance, a counter, a room. The old 120 s was for the whole walk and
+  // with a take per part it would multiply by the number of parts (and the Gemini calls with it).
+  maxDurationSec: 45,
   videoBitsPerSecond: 2_500_000,
   /** Largest recording the API accepts: the Supabase Storage file limit. Keep in sync with api/routers/guides.py. */
   maxUploadBytes: 50 * 1024 * 1024,

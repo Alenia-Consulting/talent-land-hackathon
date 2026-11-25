@@ -79,8 +79,10 @@ def add_route(
     either way the steps of the whole guide are renumbered, so "paso 3 de 7" keeps meaning
     something. The guide goes back to waiting for a video: the new route has none yet.
     """
-    if not guide.routes:
-        latest_route(guide)  # a guide older than routes keeps its steps in route 1
+    if not guide.routes and guide.steps:
+        # A guide older than routes keeps its steps in route 1. One that just lost its only
+        # recording (repeating the first take) has no steps and gets no empty route.
+        latest_route(guide)
     steps = _steps_from_marks(marks, video_duration_seconds)
     # Positions are unique per guide and the new rows start at 1: nothing may be flushed until
     # _renumber has moved every row out of the way.

@@ -115,6 +115,15 @@ export async function deleteGuide(id: string, fetchImpl?: typeof fetch): Promise
   await request<null>(`/guides/${id}`, { method: "DELETE" }, fetchImpl);
 }
 
+/** DELETE /guides/{id}/routes/{route_id} — one recording with its steps and files. Irreversible. */
+export async function deleteRoute(
+  guideId: string,
+  routeId: string,
+  fetchImpl?: typeof fetch,
+): Promise<void> {
+  await request<null>(`/guides/${guideId}/routes/${routeId}`, { method: "DELETE" }, fetchImpl);
+}
+
 /** GET /guides — one page for the review panel, most recent first, without steps. */
 export function listGuides(
   { limit = 20, offset = 0 }: { limit?: number; offset?: number } = {},

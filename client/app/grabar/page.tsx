@@ -1,52 +1,32 @@
 "use client";
 
+// The recorder: choose the parts, then record each one as its own take, when the person is ready.
+//
+// This file is the camera and the screens around it. What happens to the takes (keeping them,
+// sending them, repeating one) is in useTakes; the rules are in lib/pure/takes.ts.
+
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { RECORDING } from "../../lib/config.ts";
-import { addRoute, ApiError, createGuide, type Mark, readGuide } from "../../lib/guides.ts";
+import { ApiError, readGuide } from "../../lib/guides.ts";
 import { es } from "../../lib/i18n/es.ts";
 import type { AlertType } from "../../lib/pure/alerts.ts";
-import { markAt, PAUSE_MS, whyNotSendable } from "../../lib/pure/marks.ts";
-import { DONE_HOLD_MS } from "../../lib/pure/progress.ts";
-import { downloadGuide, type GuideInput, uploadVideo, VideoUploadError } from "../../lib/upload.ts";
+import { canFinish, nextToRecord } from "../../lib/pure/takes.ts";
 import { useAlertLog } from "../../lib/useAlertLog.ts";
 import { useCamera } from "../../lib/useCamera.ts";
 import { useFrameSampler } from "../../lib/useFrameSampler.ts";
 import { useLightMonitor } from "../../lib/useLightMonitor.ts";
 import { useMotionMonitor } from "../../lib/useMotionMonitor.ts";
 import { useRecorder } from "../../lib/useRecorder.ts";
-import { useSendingProgress } from "../../lib/useSendingProgress.ts";
-import {
-  CameraPreview,
-  CoachCard,
-  DebugPanel,
-  RecordingBar,
-  StepRail,
-  WarningStack,
-} from "./overlays.tsx";
+import { CameraPreview, CoachCard, DebugPanel, RecordingBar, WarningStack } from "./overlays.tsx";
 import { EMPTY_PLAN, PartsScreen, type Plan, planWarning } from "./parts.tsx";
-import {
-  ActionButton,
-  DoneScreen,
-  ErrorScreen,
-  IntroScreen,
-  PermissionScreen,
-  ReviewScreen,
-  SendingScreen,
-} from "./screens.tsx";
+import { ActionButton, ErrorScreen, IntroScreen, PermissionScreen } from "./screens.tsx";
+import { TakesScreen } from "./takes.tsx";
+import { type Target, useTakes } from "./useTakes.ts";
 
-type Phase =
-  | "intro"
-  | "partes"
-  | "permisos"
-  | "listo"
-  | "grabando"
-  | "revision"
-  | "enviando"
-  | "hecho"
-  | "error";
-type ErrorSource = "camera" | "upload";
+type Phase = "intro" | "partes" | "lista" | "permisos" | "listo" | "grabando" | "error";
+type ErrorSource = "camera" | "guide";
 
 export default function GrabarPage() {
   const [phase, setPhase] = useState<Phase>("intro");
@@ -55,19 +35,18 @@ export default function GrabarPage() {
   const [plan, setPlan] = useState<Plan | null>(null);
   // The parts screen is a form the footer button acts on, so the page holds what it is typing.
   const [draft, setDraft] = useState<Plan>(EMPTY_PLAN);
-  const [marks, setMarks] = useState<Mark[]>([]);
-  const [guideId, setGuideId] = useState<string | null>(null);
-  // Set when the recorder was opened from a guide ("?guia=ID"): this recording is added to it.
-  const [target, setTarget] = useState<{ id: string; venue: string } | null>(null);
-  const [routeId, setRouteId] = useState<string | null>(null);
-  const [videoSent, setVideoSent] = useState(false);
+  // Set when the recorder was opened from a guide ("?guia=ID"): the takes are added to it.
+  const [target, setTarget] = useState<(Target & { venue: string }) | null>(null);
+  const [current, setCurrent] = useState<number | null>(null);
+  const [finished, setFinished] = useState(false);
   const [error, setError] = useState<{ source: ErrorSource; message: string } | null>(null);
   const t0 = useRef(0);
 
   const camera = useCamera();
   const recorder = useRecorder();
   const alertLog = useAlertLog();
-  const sending = useSendingProgress(recorder.result?.durationSec ?? 0);
+  const list = useTakes(target);
+  const { takes } = list;
 
   // The only two dark screens of the recorder: the ones with the camera behind them.
   const cameraPhase = phase === "listo" || phase === "grabando";
@@ -91,16 +70,16 @@ export default function GrabarPage() {
     if (!guia) return;
     readGuide(guia)
       .then((existing) => {
-        setTarget({ id: existing.id, venue: existing.venue_name });
-        setDraft((now) => ({
-          ...now,
+        setTarget({
+          id: existing.id,
           venue: existing.venue_name,
-          title: `Recorrido ${existing.routes.length + 1}`,
-        }));
+          knownRoutes: existing.routes.map((route) => route.id),
+        });
+        setDraft((now) => ({ ...now, venue: existing.venue_name, title: existing.title }));
       })
       .catch((cause: unknown) => {
         const message = cause instanceof ApiError ? cause.message : es.error.camera.unknown;
-        setError({ source: "camera", message });
+        setError({ source: "guide", message });
         setPhase("error");
       });
   }, []);
@@ -118,24 +97,44 @@ export default function GrabarPage() {
     }
   }, [phase, camera.status, camera.errorKind]);
 
-  // grabando → revision when the recorder delivers the file (stop button, 120 s, or background).
+  // grabando → lista when the recorder delivers the file (stop button, the 45 s limit, background).
   useEffect(() => {
     if (phase !== "grabando") return;
     if (recorder.failed) {
       camera.stop();
       setError({ source: "camera", message: es.error.recorderFailed });
       setPhase("error");
-    } else if (recorder.result) {
-      alertLog.finish(t0.current + recorder.result.durationSec * 1000);
+    } else if (recorder.result && current !== null) {
+      const { blob, mimeType, durationSec } = recorder.result;
+      const alerts = alertLog.finish(t0.current + durationSec * 1000);
+      list.record(current, {
+        blob,
+        mimeType,
+        durationSec,
+        settings: camera.settings,
+        alerts,
+        userAgent: navigator.userAgent,
+      });
       camera.stop();
-      setPhase("revision");
+      recorder.reset();
+      setCurrent(null);
+      setPhase("lista");
     }
-  }, [phase, recorder.failed, recorder.result, camera.stop, alertLog.finish]);
+  }, [phase, current, recorder.failed, recorder.result, camera.stop, camera.settings, alertLog.finish]);
 
   const openCamera = () => {
     setResumed(false);
     setPhase("permisos");
     void camera.start();
+  };
+
+  /** Leave the previous part (that sends it) and open the camera for this one. */
+  const recordPart = (index: number) => {
+    list.flush(index);
+    recorder.reset();
+    alertLog.reset();
+    setCurrent(index);
+    openCamera();
   };
 
   const startRecording = () => {
@@ -148,128 +147,37 @@ export default function GrabarPage() {
     setPhase("grabando");
   };
 
-  const retry = () => {
-    recorder.reset();
-    alertLog.reset();
-    setMarks([]);
-    setGuideId(null);
-    setRouteId(null);
-    setVideoSent(false);
-    openCamera();
+  const repeatPart = async (index: number) => {
+    if (await list.repeat(index)) recordPart(index);
   };
 
-  const pending = plan ? plan.parts.slice(marks.length) : [];
-
-  // After each "Llegué" the person stands still PAUSE_MS for a clear photo and a sound sample,
-  // so "Parar" cannot cut the recording until that pause is over.
-  const [stillPause, setStillPause] = useState(false);
-  const stillTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
-  useEffect(() => () => clearTimeout(stillTimer.current), []);
-
-  /** "Llegué a: X" — the second of the recording where this part begins. */
-  const markArrival = () => {
-    const part = pending[0];
-    if (!part) return;
-    setMarks([...marks, markAt(part, performance.now() - t0.current)]);
-    navigator.vibrate?.(60);
-    setStillPause(true);
-    clearTimeout(stillTimer.current);
-    stillTimer.current = setTimeout(() => setStillPause(false), PAUSE_MS);
+  const finish = () => {
+    list.flush();
+    setFinished(true);
   };
 
-  const guide = (): GuideInput | null => {
-    if (!recorder.result) return null;
-    return {
-      blob: recorder.result.blob,
-      mimeType: recorder.result.mimeType,
-      durationSec: recorder.result.durationSec,
-      settings: camera.settings,
-      alerts: alertLog.alerts,
-      userAgent: navigator.userAgent,
-    };
-  };
-
-  const send = async () => {
-    // markProblem already keeps the button disabled; this is the guard, not the message.
-    const input = guide();
-    if (!plan || !input || markProblem) return;
-
-    sending.reset();
-    setPhase("enviando");
-    try {
-      // A retry after a failed upload reuses the guide: creating it again would leave a duplicate.
-      let id = guideId;
-      let route = routeId;
-      if (!id) {
-        if (target) {
-          const updated = await addRoute(target.id, {
-            title: plan.title,
-            video_duration_seconds: input.durationSec,
-            marks,
-          });
-          id = updated.id;
-          route = updated.routes[updated.routes.length - 1]?.id ?? null;
-          setRouteId(route);
-        } else {
-          const created = await createGuide({
-            title: plan.title,
-            venue_name: plan.venue,
-            video_duration_seconds: input.durationSec,
-            marks,
-          });
-          id = created.id;
-        }
-        setGuideId(id);
-      }
-      try {
-        // Resolves on the 200, which comes after the server has processed the video, not after
-        // the last byte: only then does the bar reach 100 %, and it stays there a moment.
-        await uploadVideo(id, input, sending.onUpload, undefined, route ?? undefined);
-        sending.finish();
-        setVideoSent(true);
-        await new Promise((done) => setTimeout(done, DONE_HOLD_MS));
-      } catch (cause) {
-        // 503: that deployment cannot process video. The guide is saved, the video stays on the
-        // device, and the done screen offers the download instead of claiming it was sent.
-        if (!(cause instanceof VideoUploadError && cause.status === 503)) throw cause;
-      }
-      setPhase("hecho");
-    } catch (cause) {
-      const known = cause instanceof ApiError || (cause instanceof VideoUploadError && cause.status > 0);
-      setError({ source: "upload", message: known ? cause.message : es.error.uploadFailed });
-      setPhase("error");
-    }
-  };
-
-  // Known before sending, so it is shown on the review screen with "Enviar" disabled instead of
-  // throwing the person onto a screen titled "Algo ha fallado" for something they can redo.
-  const markProblem = recorder.result
-    ? recorder.result.blob.size > RECORDING.maxUploadBytes
-      ? es.revision.tooBig
-      : whyNotSendable(marks, recorder.result.durationSec)
-    : null;
-
-  const reviewNotice =
-    recorder.result?.stopReason === "background"
-      ? es.revision.interrupted
-      : recorder.result?.stopReason === "limit"
-        ? es.revision.limit
-        : null;
+  const next = nextToRecord(takes);
+  const part = current !== null ? takes[current]?.part.title : undefined;
 
   const body = {
     intro: <IntroScreen />,
     partes: <PartsScreen plan={draft} onChange={setDraft} addingTo={target?.venue} />,
-    permisos: <PermissionScreen starting={camera.status === "starting"} resumed={resumed} />,
-    revision: recorder.result && (
-      <ReviewScreen
-        url={recorder.result.url}
-        alerts={alertLog.alerts}
-        notice={reviewNotice}
-        problem={markProblem}
+    lista: (
+      <TakesScreen
+        venue={plan?.venue ?? ""}
+        takes={takes}
+        errors={list.errors}
+        progress={list.progress}
+        finished={finished}
+        next={next}
+        onRecord={recordPart}
+        onRepeat={repeatPart}
+        onRetry={list.retry}
+        onDownload={list.download}
+        onNoise={list.setNoise}
       />
     ),
-    enviando: <SendingScreen progress={sending.progress} />,
-    hecho: <DoneScreen videoSent={videoSent} />,
+    permisos: <PermissionScreen starting={camera.status === "starting"} resumed={resumed} />,
     error: <ErrorScreen message={error?.message ?? es.error.camera.unknown} />,
   }[phase as Exclude<Phase, "listo" | "grabando">];
 
@@ -279,12 +187,35 @@ export default function GrabarPage() {
       <ActionButton
         disabled={planWarning(draft) !== null}
         onClick={() => {
-          setPlan({ ...draft, title: draft.title.trim(), venue: draft.venue.trim() });
-          setPhase("permisos");
+          const chosen = { ...draft, title: draft.title.trim(), venue: draft.venue.trim() };
+          setPlan(chosen);
+          list.begin(chosen.parts, { title: chosen.title, venue: chosen.venue });
+          setPhase("lista");
         }}
       >
         {es.partes.next}
       </ActionButton>
+    ),
+    lista: finished ? (
+      list.guideId && (
+        <Link
+          href={`/panel/guia?id=${list.guideId}`}
+          className="flex min-h-14 flex-1 items-center justify-center rounded-[18px] bg-pino px-6 text-lg font-bold text-sobre-pino"
+        >
+          {es.takes.review}
+        </Link>
+      )
+    ) : (
+      <>
+        <ActionButton variant="secondary" disabled={!canFinish(takes)} onClick={finish}>
+          {es.takes.finish}
+        </ActionButton>
+        {next !== null && (
+          <ActionButton onClick={() => recordPart(next)}>
+            {es.takes.recordNext(takes[next].part.title)}
+          </ActionButton>
+        )}
+      </>
     ),
     permisos: (
       <ActionButton onClick={openCamera} disabled={camera.status === "starting"}>
@@ -297,62 +228,21 @@ export default function GrabarPage() {
       </ActionButton>
     ),
     grabando: (
-      <>
-        {pending.length > 0 && (
-          <ActionButton tone="dark" onClick={markArrival}>
-            {es.marcar.action(pending[0].title)}
-          </ActionButton>
-        )}
-        <ActionButton
-          key={marks.length} // a new mark restarts the fill from grey-rose
-          tone="dark"
-          variant="danger"
-          waitMs={stillPause ? PAUSE_MS : undefined}
-          onClick={() => recorder.stop("user")}
-        >
-          {es.grabando.stop}
-        </ActionButton>
-      </>
+      <ActionButton tone="dark" variant="danger" onClick={() => recorder.stop("user")}>
+        {es.grabando.stop}
+      </ActionButton>
     ),
-    revision: (
-      <>
-        <ActionButton variant="secondary" onClick={retry}>
-          {es.revision.retry}
-        </ActionButton>
-        <ActionButton onClick={send} disabled={markProblem !== null}>
-          {es.revision.send}
-        </ActionButton>
-      </>
+    error: (
+      <ActionButton
+        onClick={() => {
+          if (error?.source === "guide") return window.location.reload();
+          setError(null);
+          setPhase("lista");
+        }}
+      >
+        {es.error.retryCamera}
+      </ActionButton>
     ),
-    enviando: null,
-    hecho: (
-      <>
-        {!videoSent && (
-          <ActionButton
-            variant="secondary"
-            onClick={() => {
-              const input = guide();
-              if (input) downloadGuide(input);
-            }}
-          >
-            {es.error.download}
-          </ActionButton>
-        )}
-        {guideId && <Link href={`/panel/guia?id=${guideId}`}>{es.hecho.review}</Link>}
-        <ActionButton onClick={retry}>{es.hecho.again}</ActionButton>
-      </>
-    ),
-    error:
-      error?.source === "upload" ? (
-        <>
-          <ActionButton variant="secondary" onClick={() => guide() && downloadGuide(guide()!)}>
-            {es.error.download}
-          </ActionButton>
-          <ActionButton onClick={send}>{es.error.retrySend}</ActionButton>
-        </>
-      ) : (
-        <ActionButton onClick={retry}>{es.error.retryCamera}</ActionButton>
-      ),
   }[phase];
 
   return (
@@ -368,17 +258,12 @@ export default function GrabarPage() {
             <RecordingBar remainingSec={recorder.remainingSec} maxSec={RECORDING.maxDurationSec} />
           )}
           <WarningStack active={{ luz: light.active, movimiento: motion.active }} />
-          {phase === "listo" && (
+          {phase === "listo" && part && (
             <p className="absolute inset-x-4 bottom-4 rounded-2xl bg-tinta/80 px-4 py-3 text-center text-lg">
-              {es.listo.hint}
+              {es.listo.hint(part)}
             </p>
           )}
-          {phase === "grabando" && plan && (
-            <>
-              <CoachCard nextPart={pending[0]?.title ?? null} />
-              <StepRail parts={plan.parts} done={marks.length} />
-            </>
-          )}
+          {phase === "grabando" && part && <CoachCard part={part} />}
           {debug && (
             <DebugPanel
               values={{

@@ -400,3 +400,15 @@ def test_a_measured_level_never_overwrites_what_a_person_said(client, monkeypatc
     assert response.status_code == 200, response.text
     assert step["noise_level"] == "quiet"
     assert step["noise_level_source"] == "manual"
+
+
+def test_repeating_the_only_take_leaves_no_empty_route_behind(client, monkeypatch):
+    """Delete the only recording of a draft, then add the new one: the guide has exactly one."""
+    _no_storage(monkeypatch)
+    guide = create_guide(client).json()
+
+    assert client.delete(f"/guides/{guide['id']}/routes/{guide['routes'][0]['id']}").status_code == 204
+    after = add_route(client, guide["id"], position=1).json()
+
+    assert [route["title"] for route in after["routes"]] == [ROUTE["title"]]
+    assert [step["order"] for step in after["steps"]] == [1, 2]
