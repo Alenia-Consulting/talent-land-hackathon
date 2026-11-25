@@ -47,6 +47,16 @@ class StepText:
     duration_text: str | None = None
     interests: list[str] = field(default_factory=list)
 
+    def as_draft(self) -> dict:
+        """The five text fields as written, to keep next to whatever a person edits afterwards."""
+        return {
+            "easy_read_text": self.easy_read_text,
+            "what_to_expect": self.what_to_expect,
+            "who_to_ask_for_help": self.who_to_ask_for_help,
+            "duration_text": self.duration_text,
+            "interests": self.interests,
+        }
+
     @property
     def missing_fields(self) -> list[str]:
         """The blanks the venue has to fill in. what_to_expect may be empty: nothing to warn about."""
@@ -101,6 +111,10 @@ SCHEMA = {
         "easy_read_text", "what_to_expect", "who_to_ask_for_help", "duration_text", "interests",
     ],
 }
+
+
+def model_name() -> str:
+    return os.environ.get("GEMINI_MODEL", DEFAULT_MODEL)
 
 
 def api_key() -> str | None:
@@ -188,7 +202,7 @@ def describe_step(request: StepRequest, *, send: Send | None = None) -> StepText
             "responseSchema": SCHEMA,
         },
     }
-    url = ENDPOINT.format(model=os.environ.get("GEMINI_MODEL", DEFAULT_MODEL))
+    url = ENDPOINT.format(model=model_name())
     answer = (send or _send)(url, body, {"x-goog-api-key": key, "Content-Type": "application/json"})
     try:
         return parse(answer["candidates"][0]["content"]["parts"][0]["text"])

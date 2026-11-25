@@ -8,6 +8,7 @@ Routes never touch the ORM: every read and write goes through db.guides.
 import pathlib
 import tempfile
 import uuid
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from sqlalchemy.orm import Session
@@ -83,6 +84,11 @@ def _write_texts(by_position: dict, processed: list[pipeline.ProcessedStep]) -> 
         step.duration_text = text.duration_text
         step.interests = text.interests
         step.missing_fields = text.missing_fields
+        step.ai_draft = {
+            "model": gemini.model_name(),
+            "generated_at": datetime.now(UTC).isoformat(),
+            **text.as_draft(),
+        }
 
 
 def _set_processing_status(session: Session, guide: Guide, status: str) -> None:

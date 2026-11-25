@@ -118,6 +118,7 @@ STEP_INTERESTS = ("where_to_wait", "noisy_areas", "restrooms", "who_to_ask", "ex
 
 # JSONB on PostgreSQL, plain JSON on SQLite so the CI can run without a database.
 StringList = JSON().with_variant(JSONB, "postgresql")
+JsonDocument = StringList
 
 
 class Step(TimestampMixin, Base):
@@ -168,6 +169,11 @@ class Step(TimestampMixin, Base):
     duration_text: Mapped[str | None] = mapped_column(String(80))
     category: Mapped[str] = mapped_column(String(20), nullable=False)
     interests: Mapped[list[str]] = mapped_column(StringList, nullable=False, default=list)
+
+    # What the AI wrote, as it wrote it: {"model", "generated_at", and the five text fields}. The
+    # fields above are what a person then edited, so this is the only copy of the original draft.
+    # Null when no AI draft was made. Not part of the contract.
+    ai_draft: Mapped[dict | None] = mapped_column(JsonDocument)
 
     # Review state. A guide cannot be published while any step still has missing_fields.
     missing_fields: Mapped[list[str]] = mapped_column(StringList, nullable=False, default=list)
