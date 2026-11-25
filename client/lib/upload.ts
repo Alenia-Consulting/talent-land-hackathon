@@ -67,6 +67,7 @@ function readDetail(status: number, responseText: string): string {
 
 /**
  * POST {apiUrl}/guides/{guideId}/video as multipart/form-data; XMLHttpRequest gives upload progress.
+ * With a `routeId` the video goes to that recording of the guide instead of the latest one.
  *
  * The API blurs the faces, cuts a clip and a photo per step and stores only those; the recording
  * itself never leaves the server. It still answers 503 where that processing is unavailable, and
@@ -78,10 +79,12 @@ export function uploadVideo(
   input: GuideInput,
   onProgress: (fraction: number) => void,
   createXhr: () => XMLHttpRequest = () => new XMLHttpRequest(),
+  routeId?: string,
 ): Promise<void> {
   return new Promise((resolve, reject) => {
     const xhr = createXhr();
-    xhr.open("POST", `${apiUrl()}/guides/${guideId}/video`);
+    const path = routeId ? `/guides/${guideId}/routes/${routeId}/video` : `/guides/${guideId}/video`;
+    xhr.open("POST", `${apiUrl()}${path}`);
     xhr.upload.onprogress = (event) => {
       if (event.lengthComputable) onProgress(event.loaded / event.total);
     };

@@ -33,9 +33,12 @@ const inputClass =
 export function PartsScreen({
   plan,
   onChange,
+  addingTo,
 }: {
   plan: Plan;
   onChange: (next: Plan) => void;
+  /** The venue of the guide this recording is added to: its name is not asked again. */
+  addingTo?: string;
 }) {
   const warning = planWarning(plan);
   const full = plan.parts.length >= MAX_MARKS;
@@ -47,6 +50,9 @@ export function PartsScreen({
         <p className="mt-2 text-tinta/70">{t.lead}</p>
       </div>
 
+      {addingTo ? (
+        <p className="font-bold text-pino">{t.addingTo(addingTo)}</p>
+      ) : (
       <p>
         <label htmlFor="venue-name" className="font-bold">
           {t.venue}
@@ -60,6 +66,7 @@ export function PartsScreen({
           onChange={(event) => onChange({ ...plan, venue: event.target.value })}
         />
       </p>
+      )}
 
       <p>
         <label htmlFor="guide-title" className="font-bold">

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { RECORDING } from "../../lib/config.ts";
-import { ApiError, createGuide, type Mark } from "../../lib/guides.ts";
+import { addRoute, ApiError, createGuide, type Mark, readGuide } from "../../lib/guides.ts";
 import { es } from "../../lib/i18n/es.ts";
 import type { AlertType } from "../../lib/pure/alerts.ts";
 import { markAt, PAUSE_MS, whyNotSendable } from "../../lib/pure/marks.ts";
@@ -55,6 +55,9 @@ export default function GrabarPage() {
   const [draft, setDraft] = useState<Plan>(EMPTY_PLAN);
   const [marks, setMarks] = useState<Mark[]>([]);
   const [guideId, setGuideId] = useState<string | null>(null);
+  // Set when the recorder was opened from a guide ("?guia=ID"): this recording is added to it.
+  const [target, setTarget] = useState<{ id: string; venue: string } | null>(null);
+  const [routeId, setRouteId] = useState<string | null>(null);
   const [videoSent, setVideoSent] = useState(false);
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<{ source: ErrorSource; message: string } | null>(null);
@@ -80,7 +83,24 @@ export default function GrabarPage() {
   const motion = useMotionMonitor(sample, phase === "grabando", onAlert("movimiento"));
 
   useEffect(() => {
-    setDebug(new URLSearchParams(window.location.search).get("debug") === "1");
+    const query = new URLSearchParams(window.location.search);
+    setDebug(query.get("debug") === "1");
+    const guia = query.get("guia");
+    if (!guia) return;
+    readGuide(guia)
+      .then((existing) => {
+        setTarget({ id: existing.id, venue: existing.venue_name });
+        setDraft((now) => ({
+          ...now,
+          venue: existing.venue_name,
+          title: `Recorrido ${existing.routes.length + 1}`,
+        }));
+      })
+      .catch((cause: unknown) => {
+        const message = cause instanceof ApiError ? cause.message : es.error.camera.unknown;
+        setError({ source: "camera", message });
+        setPhase("error");
+      });
   }, []);
 
   // permisos → listo | error, and back to permisos when the camera was released while waiting.
@@ -131,6 +151,7 @@ export default function GrabarPage() {
     alertLog.reset();
     setMarks([]);
     setGuideId(null);
+    setRouteId(null);
     setVideoSent(false);
     openCamera();
   };
@@ -176,18 +197,30 @@ export default function GrabarPage() {
     try {
       // A retry after a failed upload reuses the guide: creating it again would leave a duplicate.
       let id = guideId;
+      let route = routeId;
       if (!id) {
-        const created = await createGuide({
-          title: plan.title,
-          venue_name: plan.venue,
-          video_duration_seconds: input.durationSec,
-          marks,
-        });
-        id = created.id;
+        if (target) {
+          const updated = await addRoute(target.id, {
+            title: plan.title,
+            video_duration_seconds: input.durationSec,
+            marks,
+          });
+          id = updated.id;
+          route = updated.routes[updated.routes.length - 1]?.id ?? null;
+          setRouteId(route);
+        } else {
+          const created = await createGuide({
+            title: plan.title,
+            venue_name: plan.venue,
+            video_duration_seconds: input.durationSec,
+            marks,
+          });
+          id = created.id;
+        }
         setGuideId(id);
       }
       try {
-        await uploadVideo(id, input, setProgress);
+        await uploadVideo(id, input, setProgress, undefined, route ?? undefined);
         setVideoSent(true);
       } catch (cause) {
         // 503: that deployment cannot process video. The guide is saved, the video stays on the
@@ -219,7 +252,7 @@ export default function GrabarPage() {
 
   const body = {
     intro: <IntroScreen />,
-    partes: <PartsScreen plan={draft} onChange={setDraft} />,
+    partes: <PartsScreen plan={draft} onChange={setDraft} addingTo={target?.venue} />,
     permisos: <PermissionScreen starting={camera.status === "starting"} resumed={resumed} />,
     revision: recorder.result && (
       <ReviewScreen
